@@ -1,2 +1,3 @@
 # TuTaller
-Desarrollo Del Proyecto de Titulo TuTaller
+Desarrollo Del Proyecto BackEnd de TuTaller
+Arquitectura Modelo-Vista-Controlador
