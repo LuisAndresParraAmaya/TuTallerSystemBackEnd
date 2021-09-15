@@ -1,0 +1,25 @@
+{
+  "name": "SystemBackEnd-TuTaller",
+  "version": "1.0.0",
+  "description": "Sistema encargado de gestionar la logica del servidor",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon initialConfig.js"
+  },
+  "keywords": [],
+  "author": "Luis Parra",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.17.1",
+    "express-mysql-session": "^2.1.7",
+    "express-validator": "^6.12.1",
+    "morgan": "^1.10.0",
+    "mysql": "^2.18.1",
+    "passport": "^0.4.1",
+    "passport-local": "^1.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.12"
+  }
+}
