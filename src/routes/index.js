@@ -81,5 +81,16 @@ router.post('/ModifyPassword', async (req, res) => {
     }
 })
 
+router.post('/DisableAccount', async (req, res) => {
+    //RECIBIR DESDE SESSION CLIENTE. -> USER RUT CURRENT
+    const { user_rut, user_password } = req.body.data
+    const response = await pool.query(`UPDATE user SET user_status = "disabled" WHERE user_rut = ${user_rut} && user_password = "${user_password}"`)
+    if (response.affectedRows > 0) {
+        res.json({ 'Response': 'Operation Success' })
+    } else {
+        res.json({ 'Response': 'Operation Failed' })
+    }
+})
+
 
 module.exports = router
