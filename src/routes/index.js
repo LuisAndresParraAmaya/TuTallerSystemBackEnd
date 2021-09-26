@@ -13,7 +13,7 @@ router.post('/Login', async (req, res) => {
     const { user_email, user_password } = req.body.data
     const response = await pool.query(`SELECT * FROM user WHERE user_email="${user_email}" AND user_password="${user_password}" AND user_status="enabled"`)
     if (response.length > 0) {
-        res.json(response[0].user_rut)
+        res.json({ 'Response': 'Login Success', 'user_rut': response[0].user_rut })
     }
     else res.json({ 'Response': 'Login Failed' })
 })
@@ -92,5 +92,19 @@ router.post('/DisableAccount', async (req, res) => {
     }
 })
 
+router.post('/SendPostulation', async (req, res) => {
+    const { user_rut, workshop_name, workshop_number, workshop_description, postulation_message } = req.body.data
+    const statement = `INSERT INTO workshop (workshop_name, workshop_number, workshop_description) VALUES ("${workshop_name}", ${workshop_number}, "${workshop_description}")`
+    const response = await pool.query(statement)
+    if (response.affectedRows > 0) {
+        const statement2 = `INSERT INTO postulation (user_user_rut, postulation_message, postulation_current_status, workshop_id, postulation_date_time) VALUES (${user_rut}, '${postulation_message}', 'pending', ${response.insertId}, now())`
+        const response2 = await pool.query(statement2)
+        if (response2.affectedRows > 0) {
+            res.json({ 'Response': 'Operation Success' })
+        }
+    } else {
+        res.json({ 'Response': 'Operation Failed' })
+    }
+})
 
 module.exports = router
