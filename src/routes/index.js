@@ -107,4 +107,14 @@ router.post('/SendPostulation', async (req, res) => {
     }
 })
 
+router.get('/WorkshopPostulations', async (req, res) => {
+    const statement = `SELECT * FROM postulation WHERE postulation_current_status = 'pending'`
+    const response = await pool.query(statement)
+    if (response.length > 0) {
+        res.json({ 'Response': 'Operation Success', 'Postulations': response })
+    } else {
+        res.json({ 'Response': 'Operation Failed' })
+    }
+})
+
 module.exports = router
