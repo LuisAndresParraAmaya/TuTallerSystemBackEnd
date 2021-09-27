@@ -108,7 +108,18 @@ router.post('/SendPostulation', async (req, res) => {
 })
 
 router.get('/WorkshopPostulations', async (req, res) => {
-    const statement = `SELECT * FROM postulation WHERE postulation_current_status = 'pending'`
+    const statement = `SELECT
+                    w1.id,
+                    postulation_current_status,
+                    postulation_message,
+                    workshop_id,
+                    postulation_date_time,
+                    workshop_name
+                    FROM
+                    postulation w1
+                    INNER JOIN workshop w2
+                    ON w1.workshop_id = w2.id
+                    WHERE postulation_current_status='pending'`
     const response = await pool.query(statement)
     if (response.length > 0) {
         res.json({ 'Response': 'Operation Success', 'Postulations': response })
