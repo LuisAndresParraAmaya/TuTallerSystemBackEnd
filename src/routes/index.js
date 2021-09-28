@@ -114,12 +114,15 @@ router.get('/WorkshopPostulations', async (req, res) => {
                     postulation_message,
                     workshop_id,
                     postulation_date_time,
-                    workshop_name
+                    workshop_name,
+                    workshop_description,
+                    workshop_number,
+                    user_user_rut
                     FROM
                     postulation w1
                     INNER JOIN workshop w2
                     ON w1.workshop_id = w2.id
-                    WHERE postulation_current_status='pending'`
+                    ORDER BY postulation_date_time desc`
     const response = await pool.query(statement)
     if (response.length > 0) {
         res.json({ 'Response': 'Operation Success', 'Postulations': response })
@@ -128,4 +131,33 @@ router.get('/WorkshopPostulations', async (req, res) => {
     }
 })
 
+router.post('/AcceptWorkshopPostulation', async (req, res) => {
+    const { id, user_rut } = req.body.data
+    const query = `UPDATE postulation SET postulation_current_status = 'accepted' WHERE id = ${id}`
+    const query2 = `SELECT user_email FROM user WHERE user_rut = ${user_rut}`
+    await pool.query(query)
+    const response = await pool.query(query2)
+    await transporter.sendMail({
+        from: '"Tu taller fue aceptado" <luisandresparraamaya@gmail.com>', 
+        to: response[0].user_email,
+        subject: "Aceptación de postulación en TuTaller", 
+        html: `<b>La postulación de su taller fue aprobada.</b>`, 
+    })
+    res.json({ 'Response': 'Operation Success' })
+})
+
+router.post('/RejectWorkshopPostulation', async (req, res) => {
+    const { id, user_rut, reject_reason } = req.body.data
+    const query = `UPDATE postulation SET postulation_current_status = 'rejected' WHERE id = ${id}`
+    const query2 = `SELECT user_email FROM user WHERE user_rut = ${user_rut}`
+    await pool.query(query)
+    const response = await pool.query(query2)
+    await transporter.sendMail({
+        from: '"Tu taller fue rechazado" <luisandresparraamaya@gmail.com>', 
+        to: response[0].user_email,
+        subject: "Rechazo de postulación en TuTaller", 
+        html: `<b>La postulación de su taller fue rechazada por la siguiente razón: ${reject_reason}</b>`, 
+    })
+    res.json({ 'Response': 'Operation Success' })
+})
 module.exports = router
