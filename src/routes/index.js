@@ -5,7 +5,7 @@ const transporter = require('../controller/mailer.js')
 router.post('/CreateAccount', async (req, res) => {
     const { user_rut, user_type_id, user_name, user_last_name, user_email, user_phone, user_password, user_status } = req.body.data
     const response = await pool.query(`INSERT INTO user (user_rut, user_type_id, user_name, user_last_name, user_email, user_phone, user_password, user_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [`${user_rut}`, `${user_type_id}`, `${user_name}`, `${user_last_name}`, `${user_email}`, `${user_phone}`, `${user_password}`, `${user_status}`])
+        [`${user_rut}`, `${user_type_id}`, `${user_name}`, `${user_last_name}`, `${user_email}`, `${user_phone}`, `${user_password}`, `${user_status}`])
     if (response.length > 0) res.json({ 'Response': 'Create Account Success' })
     else res.json({ 'Response': 'Create Account Failed' })
 })
@@ -138,10 +138,10 @@ router.post('/AcceptWorkshopPostulation', async (req, res) => {
     await pool.query(query, [`accepted`, `${id}`])
     const response = await pool.query(query2, [`${user_rut}`])
     await transporter.sendMail({
-        from: '"Tu taller fue aceptado" <luisandresparraamaya@gmail.com>', 
+        from: '"Tu taller fue aceptado" <luisandresparraamaya@gmail.com>',
         to: response[0].user_email,
-        subject: "Aceptación de postulación en TuTaller", 
-        html: `<b>La postulación de su taller fue aprobada.</b>`, 
+        subject: "Aceptación de postulación en TuTaller",
+        html: `<b>La postulación de su taller fue aprobada.</b>`,
     })
     res.json({ 'Response': 'Operation Success' })
 })
@@ -153,11 +153,40 @@ router.post('/RejectWorkshopPostulation', async (req, res) => {
     await pool.query(query, [`rejected`, `${id}`])
     const response = await pool.query(query2, [`${user_rut}`])
     await transporter.sendMail({
-        from: '"Tu taller fue rechazado" <luisandresparraamaya@gmail.com>', 
+        from: '"Tu taller fue rechazado" <luisandresparraamaya@gmail.com>',
         to: response[0].user_email,
-        subject: "Rechazo de postulación en TuTaller", 
-        html: `<b>La postulación de su taller fue rechazada por la siguiente razón: ${reject_reason}</b>`, 
+        subject: "Rechazo de postulación en TuTaller",
+        html: `<b>La postulación de su taller fue rechazada por la siguiente razón: ${reject_reason}</b>`,
     })
     res.json({ 'Response': 'Operation Success' })
+})
+
+router.post('/AddWorkshopOffice', async (req, res) => {
+    const { workshop_id, commune_id, workshop_suscription_id, workshop_office_address, workshop_office_phone, workshop_office_attention } = req.body.data
+    const statement = `INSERT INTO workshop_office (workshop_id, commune_id, workshop_suscription_id, workshop_office_address, workshop_office_phone)
+    VALUES (?, ?, ?, ?, ?)`
+    const response = await pool.query(statement, [`${workshop_id}`, `${commune_id}`, `${workshop_suscription_id}`, `${workshop_office_address}`, `${workshop_office_phone}`])
+    if (response.affectedRows > 0) {
+        let values = ''
+        for (let i = 0; i < workshop_office_attention.length; i++) {
+            let day = workshop_office_attention[i].workshop_office_attention_day
+            let aperture = workshop_office_attention[i].workshop_office_attention_aperture_time
+            let departure = workshop_office_attention[i].workshop_office_attention_departure_time
+            let myrow = `(${workshop_id}, "${day}", "${aperture}", "${departure}")`
+            //SI ESTAMOS EN LA ULTIMA ITERACION NO SE LE AGREGA LA COMA AL FINAL DEL STRING
+            if (i == (workshop_office_attention.length - 1)) {
+                values = values.concat(myrow)
+            } else {
+                values = values.concat(myrow + ',')
+            }
+        }
+        const statement2 = `INSERT INTO workshop_office_attention (workshop_office_id, workshop_office_attention_day, workshop_office_attention_aperture_time, workshop_office_attention_departure_time) VALUES ${values}`
+        const response2 = await pool.query(statement2)
+        if (response2.affectedRows > 0) {
+            res.json({ 'Response': 'Office Attention Success' })
+        }
+    } else {
+        res.json({ 'Response': 'Operation Failed' })
+    }
 })
 module.exports = router
