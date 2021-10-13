@@ -48,8 +48,20 @@ router.post('/Login', async (req, respuesta) => {
                 if(response[0].user_status == 'disabled'){
                     respuesta.json({ 'Response': 'Account disabled'})
                 }
+                if(response[0].user_status == 'deleted'){
+                    respuesta.json({ 'Response': 'Account deleted'})
+                }
                 if(response[0].user_status == 'enabled'){
-                    respuesta.json({ 'Response': 'Login Success', 'user_rut': response[0].user_rut, 'user_name': response[0].user_name, 'user_last_name': response[0].user_last_name, 'user_phone': response[0].user_phone, 'user_email': response[0].user_email, 'user_password': response[0].user_password })
+                    respuesta.json({ 
+                        'Response': 'Login Success', 
+                        'user_rut': response[0].user_rut, 
+                        'user_name': response[0].user_name, 
+                        'user_last_name': response[0].user_last_name, 
+                        'user_phone': response[0].user_phone, 
+                        'user_email': response[0].user_email, 
+                        'user_password': response[0].user_password, 
+                        'user_type_id': response[0].user_type_id
+                    })
                 }
             }else{
                 respuesta.json({ 'Response': 'Login Failed' })
