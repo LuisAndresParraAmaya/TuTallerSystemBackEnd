@@ -349,4 +349,13 @@ router.post('/MyWorkShopOfficeList', async (req, res) => {
 // a.workshop_office_attention_departure_time,
 // a.workshop_office_id,
 
+router.post('/MyWorkshopOfficeAttention', async (req, res) => {
+    const { workshop_office_id } = req.body.data
+    const response = await pool.query(`SELECT workshop_office_attention_day, workshop_office_attention_aperture_time, workshop_office_attention_departure_time FROM 
+    workshop_office_attention WHERE workshop_office_id = ?`, [`${workshop_office_id}`])
+    if (response.length > 0) {
+        res.json({ response })
+    }
+    else res.json({ 'Response': 'Attention Not Found' })
+})
 module.exports = router
