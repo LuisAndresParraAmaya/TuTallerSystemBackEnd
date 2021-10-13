@@ -343,12 +343,15 @@ router.post('/MyWorkShopOfficeList', async (req, res) => {
     c.region_id AS commune_region_id,
     c.commune_name,
     r.region_name,
-    r.id
+    r.id,
+    s.name AS workshop_office_suscription_name
         FROM workshop_office w
         INNER JOIN commune c
         ON c.id = w.commune_id
         INNER JOIN region r
         ON r.id = c.id
+        INNER JOIN workshop_office_suscription s
+        ON s.id = w.workshop_suscription_id
         WHERE w.workshop_id = ?`, [`${workshop_id}`])
     if (response.length > 0) {
         res.json({ response })
