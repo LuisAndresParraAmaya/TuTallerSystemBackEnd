@@ -248,6 +248,7 @@ router.post('/RejectWorkshopPostulation', async (req, res) => {
 
 router.post('/AddWorkshopOffice', async (req, res) => {
     const { workshop_id, commune_id, workshop_suscription_id, workshop_office_address, workshop_office_phone, workshop_office_attention } = req.body.data
+    try {
     const statement = `INSERT INTO workshop_office (workshop_id, commune_id, workshop_suscription_id, workshop_office_address, workshop_office_phone)
     VALUES (?, ?, ?, ?, ?)`
     const response = await pool.query(statement, [`${workshop_id}`, `${commune_id}`, `${workshop_suscription_id}`, `${workshop_office_address}`, `${workshop_office_phone}`])
@@ -257,7 +258,8 @@ router.post('/AddWorkshopOffice', async (req, res) => {
             let day = workshop_office_attention[i].workshop_office_attention_day
             let aperture = workshop_office_attention[i].workshop_office_attention_aperture_time
             let departure = workshop_office_attention[i].workshop_office_attention_departure_time
-            let myrow = `(${workshop_id}, "${day}", "${aperture}", "${departure}")`
+            // Aca va el identificador de la sucursal
+            let myrow = `(${response.insertId}, "${day}", "${aperture}", "${departure}")`
             //SI ESTAMOS EN LA ULTIMA ITERACION NO SE LE AGREGA LA COMA AL FINAL DEL STRING
             if (i == (workshop_office_attention.length - 1)) {
                 values = values.concat(myrow)
@@ -265,14 +267,17 @@ router.post('/AddWorkshopOffice', async (req, res) => {
                 values = values.concat(myrow + ',')
             }
         }
+    } } catch (exception) {
+        if (exception.sqlMessage.includes(workshop_office_address)) {
+            res.json({ 'Response': 'Address already in use'})
+            return
+        }
+    }
         const statement2 = `INSERT INTO workshop_office_attention (workshop_office_id, workshop_office_attention_day, workshop_office_attention_aperture_time, workshop_office_attention_departure_time) VALUES ${values}`
         const response2 = await pool.query(statement2)
         if (response2.affectedRows > 0) {
             res.json({ 'Response': 'Office Attention Success' })
         }
-    } else {
-        res.json({ 'Response': 'Operation Failed' })
-    }
 })
 
 
@@ -301,12 +306,44 @@ router.post('/SendValidateEmailCode', async (req, res) => {
 })
 
 router.post('/MyWorkShopList', async (req, res) => {
-    const { user_rut } = req.body
+    const { user_rut } = req.body.data
     const response = await pool.query(`SELECT *
     FROM WORKSHOP
     INNER JOIN POSTULATION
     ON WORKSHOP.ID = POSTULATION.WORKSHOP_ID
     WHERE POSTULATION.USER_USER_RUT = ? && POSTULATION.POSTULATION_CURRENT_STATUS = ?`, [`${user_rut}`, `accepted`])
+    if (response.length > 0) {
+        res.json({ response })
+    }
+    else res.json({ 'Response': 'Any WorkShop Found' })
+})
+
+router.post('/MyWorkShopOfficeList', async (req, res) => {
+    const { workshop_id } = req.body.data
+    const response = await pool.query(`SELECT 
+    w.id AS workshop_office_id,
+    w.workshop_id AS workshop_office_workshop_id,
+    w.commune_id AS workshop_office_commune_id,
+    w.workshop_suscription_id,
+    w.workshop_office_address,
+    w.workshop_office_phone,
+    c.id AS commune_id,
+    c.region_id AS commune_region_id,
+    c.commune_name,
+    a.workshop_office_attention_day,
+    a.workshop_office_attention_aperture_time,
+    a.workshop_office_attention_departure_time,
+    a.workshop_office_id,
+    r.region_name,
+    r.id
+        FROM workshop_office w
+        INNER JOIN commune c
+        ON c.id = w.commune_id
+        INNER JOIN workshop_office_attention a
+        ON a.workshop_office_id = w.id
+        INNER JOIN region r
+        ON r.id = c.id
+        WHERE w.workshop_id = ?`, [`${workshop_id}`])
     if (response.length > 0) {
         res.json({ response })
     }
