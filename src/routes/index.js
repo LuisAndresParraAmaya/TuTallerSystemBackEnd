@@ -248,12 +248,12 @@ router.post('/RejectWorkshopPostulation', async (req, res) => {
 
 router.post('/AddWorkshopOffice', async (req, res) => {
     const { workshop_id, commune_id, workshop_suscription_id, workshop_office_address, workshop_office_phone, workshop_office_attention } = req.body.data
+    let values = ''
     try {
     const statement = `INSERT INTO workshop_office (workshop_id, commune_id, workshop_suscription_id, workshop_office_address, workshop_office_phone)
     VALUES (?, ?, ?, ?, ?)`
     const response = await pool.query(statement, [`${workshop_id}`, `${commune_id}`, `${workshop_suscription_id}`, `${workshop_office_address}`, `${workshop_office_phone}`])
     if (response.affectedRows > 0) {
-        let values = ''
         for (let i = 0; i < workshop_office_attention.length; i++) {
             let day = workshop_office_attention[i].workshop_office_attention_day
             let aperture = workshop_office_attention[i].workshop_office_attention_aperture_time
@@ -330,17 +330,11 @@ router.post('/MyWorkShopOfficeList', async (req, res) => {
     c.id AS commune_id,
     c.region_id AS commune_region_id,
     c.commune_name,
-    a.workshop_office_attention_day,
-    a.workshop_office_attention_aperture_time,
-    a.workshop_office_attention_departure_time,
-    a.workshop_office_id,
     r.region_name,
     r.id
         FROM workshop_office w
         INNER JOIN commune c
         ON c.id = w.commune_id
-        INNER JOIN workshop_office_attention a
-        ON a.workshop_office_id = w.id
         INNER JOIN region r
         ON r.id = c.id
         WHERE w.workshop_id = ?`, [`${workshop_id}`])
@@ -349,5 +343,10 @@ router.post('/MyWorkShopOfficeList', async (req, res) => {
     }
     else res.json({ 'Response': 'Any WorkShop Found' })
 })
+// OTRA RUTA->VER MAS
+// a.workshop_office_attention_day,
+// a.workshop_office_attention_aperture_time,
+// a.workshop_office_attention_departure_time,
+// a.workshop_office_id,
 
 module.exports = router
