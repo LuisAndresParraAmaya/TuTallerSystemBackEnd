@@ -432,5 +432,34 @@ router.post('/WorkshopOfficeServiceList', async (req, res) => {
     else res.json({ 'Response': 'Services not found' })
 })
 
+router.get('/WorkshopOfficeList', async (req, res) => {
+    const response = await pool.query(`SELECT
+    w.id AS workshop_id,
+    o.id AS workshop_office_id,
+    w.workshop_name,
+    w.workshop_number,
+    w.workshop_description,
+    c.id AS commune_id,
+    o.workshop_office_address,
+    o.workshop_suscription_id,
+    o.workshop_office_phone,
+    AVG(COALESCE(e.workshop_evaluation_rating, 0)) AS workshop_average_rating,
+    COUNT(e.id) AS workshop_total_evaluations
+    FROM workshop w
+    INNER JOIN workshop_office o
+    ON w.id = o.workshop_id
+    INNER JOIN commune c
+    ON o.commune_id = c.id
+    INNER JOIN region r
+    ON c.region_id = r.id
+    LEFT OUTER JOIN workshop_office_evaluation e
+    ON o.id = e.workshop_office_id
+    WHERE workshop_suscription_id = 2
+    GROUP BY o.id`)
+    if (response.length > 0) {
+        res.json({ response })
+    }
+    else res.json({ 'Response': 'Offices not found' })
+})
 
 module.exports = router
