@@ -440,11 +440,14 @@ router.get('/WorkshopOfficeList', async (req, res) => {
     w.workshop_number,
     w.workshop_description,
     c.id AS commune_id,
+    c.commune_name AS workshop_office_commune,
+    r.id AS region_id,
+    r.region_name AS workshop_office_region,
     o.workshop_office_address,
     o.workshop_suscription_id,
     o.workshop_office_phone,
-    round(AVG(COALESCE(e.workshop_evaluation_rating, 0)), 1) AS workshop_average_rating,
-    COUNT(e.id) AS workshop_total_evaluations
+    ROUND(AVG(COALESCE(e.workshop_evaluation_rating, 0)), 1) AS workshop_office_average_rating,
+    COUNT(e.id) AS workshop_office_total_evaluations
     FROM workshop w
     INNER JOIN workshop_office o
     ON w.id = o.workshop_id
@@ -454,7 +457,7 @@ router.get('/WorkshopOfficeList', async (req, res) => {
     ON c.region_id = r.id
     LEFT OUTER JOIN workshop_office_evaluation e
     ON o.id = e.workshop_office_id
-    WHERE workshop_suscription_id = 2
+    WHERE workshop_suscription_id = 1
     GROUP BY o.id`)
     if (response.length > 0) {
         res.json({ response })
