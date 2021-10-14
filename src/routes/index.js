@@ -413,7 +413,10 @@ router.post('/AddWorkshopOfficeService', async (req, res) => {
 
 router.post('/WorkshopOfficeEmployeeList', async (req, res) => {
     const { workshop_office_id } = req.body.data
-    const response = await pool.query(`select * from workshop_office_employee WHERE workshop_office_id = ?`, [`${workshop_office_id}`])
+    const response = await pool.query(`select workshop_office_employee_experience, workshop_office_employee_specialization, u.user_name, u.user_last_name, e.id AS employee_id, u.user_rut
+    from workshop_office_employee e 
+    INNER JOIN user u ON u.user_rut = e.user_rut
+    WHERE workshop_office_id = ?`, [`${workshop_office_id}`])
     if (response.length > 0) {
         res.json({ response })
     }
