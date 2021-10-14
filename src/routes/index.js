@@ -443,7 +443,7 @@ router.get('/WorkshopOfficeList', async (req, res) => {
     o.workshop_office_address,
     o.workshop_suscription_id,
     o.workshop_office_phone,
-    AVG(COALESCE(e.workshop_evaluation_rating, 0)) AS workshop_average_rating,
+    round(AVG(COALESCE(e.workshop_evaluation_rating, 0)), 1) AS workshop_average_rating,
     COUNT(e.id) AS workshop_total_evaluations
     FROM workshop w
     INNER JOIN workshop_office o
