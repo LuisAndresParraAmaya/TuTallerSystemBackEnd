@@ -411,5 +411,12 @@ router.post('/AddWorkshopOfficeService', async (req, res) => {
     }
 })
 
-
+router.post('/WorkshopOfficeEmployeeList', async (req, res) => {
+    const { workshop_office_id } = req.body.data
+    const response = await pool.query(`select * from workshop_office_employee WHERE workshop_office_id = ?`, [`${workshop_office_id}`])
+    if (response.length > 0) {
+        res.json({ response })
+    }
+    else res.json({ 'Response': 'Employees not found' })
+})
 module.exports = router
