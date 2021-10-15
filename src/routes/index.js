@@ -230,9 +230,11 @@ router.get('/WorkshopPostulations', async (req, res) => {
 
 router.post('/AcceptWorkshopPostulation', async (req, res) => {
     const { id, user_rut } = req.body.data
-    const query = `UPDATE postulation SET postulation_current_status = ? WHERE id = ?`
+    const query = `UPDATE postulation SET postulation_current_status = accepted WHERE id = ?`
+    await pool.query(query, [`${id}`])
+    const query01 = 'UPDATE user SET user_type = 3 WHERE user_rut = ?'
+    await pool.query(query01, [`${user_rut}`])
     const query2 = `SELECT user_email FROM user WHERE user_rut = ?`
-    await pool.query(query, [`accepted`, `${id}`])
     const response = await pool.query(query2, [`${user_rut}`])
     await transporter.sendMail({
         from: '"Tu taller fue aceptado" <luisandresparraamaya@gmail.com>',
@@ -458,11 +460,49 @@ router.get('/WorkshopOfficeList', async (req, res) => {
     LEFT OUTER JOIN workshop_office_evaluation e
     ON o.id = e.workshop_office_id
     WHERE workshop_suscription_id = 1
-    GROUP BY o.id`)
+    GROUP BY o.id
+    ORDER BY workshop_office_average_rating DESC`)
     if (response.length > 0) {
         res.json({ response })
     }
     else res.json({ 'Response': 'Offices not found' })
+})
+
+router.post('/FileWorkShopOfficeComplaint', async (req, res) => {
+    const { workshop_id, workshop_name, workshop_office_region, workshop_office_commune, workshop_office_address, complaint } = req.body.data
+    const response1 = await pool.query(`SELECT
+        u.user_name,
+        u.user_last_name,
+        u.user_email
+        FROM postulation p
+        INNER JOIN user u
+        ON p.user_user_rut = u.user_rut
+        WHERE p.workshop_id = ?`, [`${workshop_id}`])
+    const workshopadmin = response1[0]
+    const response2 = await pool.query(`SELECT user_email FROM user WHERE user_type_id = 1`)
+    const systemadmin = response2[0]
+    // Enviar correo al administrador del taller y administradores del sistema
+    await transporter.sendMail({
+        from: '"TuTaller" <luisandresparraamaya@gmail.com>', 
+        to: workshopadmin.user_email, 
+        cc: systemadmin.user_email,
+        subject: `Reclamo hacia una sucursal del taller ${workshop_name}`, 
+        html: `<p>Estimado administrador del taller ${workshop_name}, ${workshopadmin.user_name} ${workshopadmin.user_last_name}, y administradores de TuTaller, este 
+        reclamo va dirigido hacia la sucursal proveniente de ${workshop_office_address}, de la comuna de ${workshop_office_commune}, ${workshop_office_region}.</p><br/>
+
+        <p>El reclamo escrito por el usuario es el siguiente:</p><br/>
+        
+        <p>${complaint}</p><br/>
+
+        <b style="color: #166C9B">Tu Taller</b><br/>
+        Santiago, Puente Alto<br/>
+        Pasaje Hotu Matua #1623<br/>
+        Teléfonos: +56 9 8440 2225, +56 9 9472 8410 y +56 9 9653 3164<br/>
+        www.tutaller.cl<br/><br/>
+        <hr/>
+        <p>CONFIDENCIALIDAD: La información contenida en este mensaje y/o en los archivos adjuntos es de carácter confidencial o privilegiada y está destinada al uso exclusivo del emisor y/o de la persona o entidad a quien va dirigida. Si usted no es el destinatario, cualquier almacenamiento, divulgación, distribución o copia de esta información está estrictamente prohibida y será sancionado por la ley. Si recibió este mensaje por error, por favor infórmenos inmediatamente respondiendo este mismo mensaje y borre éste y todos los archivos adjuntos. Gracias.</p><br/><br/>
+        <p>CONFIDENTIALITY NOTE: The information contained in this email, or any attachments to it, may be confidential and/or privileged and are for the intended addressee(s) only. Any unauthorized use, retention, disclosure, distribution or copying of this e-mail, or any information it contains, is prohibited and may be sanctioned by law. If you are not the intended recipient and received this message by mistake, please reply to sender and inform us, and then delete this mail and all attachments from your computer. Thank you.</p>`
+    })
 })
 
 module.exports = router
