@@ -552,4 +552,13 @@ router.post('/AddWorkshopOfficeAd', async (req, res) => {
     else res.json({ 'Response': 'Operation Failed' })
 })
 
+router.post('/WorkshopOfficeAdList', async (req, res) => {
+    const { workshop_office_id } = req.body.data
+    const response = await pool.query(`SELECT * FROM workshop_office_ad WHERE workshop_office_id = ?`, [`${workshop_office_id}`])
+    if (response.length > 0) {
+        res.json({ response })
+    }
+    else res.json({ 'Response': 'Ads not found' })
+})
+
 module.exports = router
