@@ -3,6 +3,9 @@ const express = require('express')
 const morgan = require('morgan')	
 const app = express()
 // middlewares
+// Habilitando lectura de archivos.
+const formidable = require('express-form-data')
+app.use(formidable.parse({ keepExtensions: true }))
 app.use(morgan('dev'))
 app.use(express.json())
 app.use(express.urlencoded({extended: false}))
