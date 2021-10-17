@@ -12,6 +12,7 @@
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "express": "^4.17.1",
+    "express-form-data": "^2.0.17",
     "express-mysql-session": "^2.1.7",
     "express-validator": "^6.12.1",
     "morgan": "^1.10.0",
