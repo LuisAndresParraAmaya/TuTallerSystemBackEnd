@@ -587,11 +587,8 @@ router.post('/AdvertiseWorkShopOfficeAd', async (req, res) => {
         WHERE id = ?;`, [`${spent}`, `${req.body.data.workshop_office_ad_bid}`, `${req.body.data.id}`])
 
     // Programar tarea de actualizacion tras 1 minuto.
-    // await pool.query(`
-    // SET GLOBAL event_scheduler = ON;
-    // DROP EVENT IF EXISTS NEW;
-    // CREATE EVENT NEW ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 45 second 
-    // DO UPDATE workshop_office_ad set workshop_office_ad_status = 'inactive', workshop_office_ad_bid = 0 WHERE id = ${req.body.data.id};`)
+    await pool.query(`DROP EVENT IF EXISTS workshopOfficeAd${req.body.data.id};`)
+    await pool.query(`CREATE EVENT workshopOfficeAd${req.body.data.id} ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 15 second DO UPDATE workshop_office_ad set workshop_office_ad_status = 'inactive', workshop_office_ad_bid = 0 WHERE id = ${req.body.data.id};`)
     res.json({ 'Response': 'Operation Success' })
 })
 
