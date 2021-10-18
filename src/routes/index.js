@@ -514,7 +514,6 @@ workshop_ad_money_spent, workshop_ad_status) values (31, 40000, 1, 'Aprovecha el
 
 router.post('/AddWorkshopOfficeAd', async (req, res) => {
     const { workshop_office_id,
-        workshop_office_ad_bid,
         workshop_office_ad_name } = req.body
     // Proceso de guardado de imagen en el servidor.
     const image = req.files.file
@@ -529,7 +528,7 @@ router.post('/AddWorkshopOfficeAd', async (req, res) => {
         image_id,
         workshop_office_ad_name,
         workshop_office_ad_money_spent, 
-        workshop_office_ad_status) 
+        workshop_office_ad_status)
         values (
             ?, 
             ?, 
@@ -539,17 +538,14 @@ router.post('/AddWorkshopOfficeAd', async (req, res) => {
             ?
             )`,
         [
-        `${workshop_office_id}`,
-        `${workshop_office_ad_bid}`,
-        `${resSaveImage.insertId}`,
-        `${workshop_office_ad_name}`,
-        `0`,
-        `unpublished`
+            `${workshop_office_id}`,
+            `0`,
+            `${resSaveImage.insertId}`,
+            `${workshop_office_ad_name}`,
+            `0`,
+            `inactive`
         ])
-    if (response.length > 0) {
-        res.json({ 'Response': 'Operation Success' })
-    }
-    else res.json({ 'Response': 'Operation Failed' })
+    res.json({ 'Response': 'Operation Success' })
 })
 
 router.post('/WorkshopOfficeAdList', async (req, res) => {
@@ -559,6 +555,30 @@ router.post('/WorkshopOfficeAdList', async (req, res) => {
         res.json({ response })
     }
     else res.json({ 'Response': 'Ads not found' })
+})
+
+router.post('/AdvertiseWorkShopOfficeAd', async (req, res) => {
+    const resp = await pool.query(`SELECT workshop_office_ad_money_spent, workshop_office_ad_status from workshop_office_ad WHERE id = ?`, [`${req.body.data.id}`])
+    let status = resp[0].workshop_office_ad_status
+    if (status == 'active') {
+        res.json({ 'Response': 'Ad already activated' })
+        return
+    }
+    let spent = resp[0].workshop_office_ad_money_spent
+    spent += parseInt(req.body.data.workshop_office_ad_bid)
+    await pool.query(`UPDATE workshop_office_ad 
+        set workshop_office_ad_status = 'active',
+        workshop_office_ad_money_spent = ?,
+        workshop_office_ad_bid = ?
+        WHERE id = ?;`, [`${spent}`, `${req.body.data.workshop_office_ad_bid}`, `${req.body.data.id}`])
+
+    // Programar tarea de actualizacion tras 1 minuto.
+    // await pool.query(`
+    // SET GLOBAL event_scheduler = ON;
+    // DROP EVENT IF EXISTS NEW;
+    // CREATE EVENT NEW ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 45 second 
+    // DO UPDATE workshop_office_ad set workshop_office_ad_status = 'inactive', workshop_office_ad_bid = 0 WHERE id = ${req.body.data.id};`)
+    res.json({ 'Response': 'Operation Success' })
 })
 
 module.exports = router
