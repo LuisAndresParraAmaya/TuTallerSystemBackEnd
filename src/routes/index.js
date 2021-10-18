@@ -616,7 +616,7 @@ router.get('/img', async (req, res) => {
     WHERE o.workshop_office_ad_status = 'active'
     ORDER BY RAND() * workshop_office_ad_bid DESC
     LIMIT 1;`)
-    if(response[0].image_name !== undefined){
+    if(response[0] !== undefined){
         res.sendFile(`${response[0].image_name}`, { root: 'public/images' });
     }
   
