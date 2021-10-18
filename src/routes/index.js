@@ -76,7 +76,6 @@ router.post('/Login', async (req, respuesta) => {
 router.post('/ModifyProfile', async (req, respuesta) => {
     //RECIBIR DESDE SESSION CLIENTE. -> USER RUT CURRENT
     const { user_new_rut, user_rut, user_name, user_last_name, user_email, user_phone, user_password } = req.body.data
-    console.log(user_password)
     const response = await pool.query('SELECT * FROM `user` WHERE `user_rut` = ?', [`${user_rut}`]);
     bcryptjs.compare(user_password, response[0].user_password, async function (err, res) {
         if (res) {
@@ -272,11 +271,11 @@ router.post('/AddWorkshopOffice', async (req, res) => {
             workshop_office_phone)
             VALUES (?, ?, ?, ?, ?)`
         const response = await pool.query(
-            statement, 
-            [`${workshop_id}`, `${commune_id}`, 
-            `${workshop_office_suscription_id}`, `${workshop_office_address}`, 
+            statement,
+            [`${workshop_id}`, `${commune_id}`,
+            `${workshop_office_suscription_id}`, `${workshop_office_address}`,
             `${workshop_office_phone}`])
-            console.log("PASANDO EL INSERTINTO")
+        console.log("PASANDO EL INSERTINTO")
         if (response.affectedRows > 0) {
             for (let i = 0; i < workshop_office_attention.length; i++) {
                 let day = workshop_office_attention[i].workshop_office_attention_day
@@ -391,14 +390,18 @@ router.post('/MyWorkshopOfficeAttention', async (req, res) => {
 router.post('/AddWorkshopOfficeEmployee', async (req, res) => {
     const { workshop_office_id, user_rut, workshop_office_employee_specialization, workshop_office_employee_experience } = req.body.data
     try {
-        const statement = `INSERT INTO workshop_office_employee (workshop_office_id, user_rut, workshop_office_employee_specialization, workshop_office_employee_experience) VALUES (?, ?, ?, ?)`
-        const response = await pool.query(statement, [`${workshop_office_id}`, `${user_rut}`, `${workshop_office_employee_specialization}`, `${workshop_office_employee_experience}`])
-        if (response.affectedRows > 0) {
-            const statement2 = `UPDATE user set user_type_id = ? WHERE user_rut = ?`
-            await pool.query(statement2, [`4`, `${user_rut}`])
-            res.json({ 'Response': 'Operation Success' })
-        }
-    } catch (exception) {
+            const statement2 = `UPDATE user set user_type_id = 4 WHERE user_rut = ? && (user_type_id = 2 OR user_type_id = 4)`
+            const resp2 = await pool.query(statement2, [`${user_rut}`])
+    
+            if (resp2.affectedRows > 0) {
+                const statement = `INSERT INTO workshop_office_employee (workshop_office_id, user_rut, workshop_office_employee_specialization, workshop_office_employee_experience) VALUES (?, ?, ?, ?)`
+                const response = await pool.query(statement, [`${workshop_office_id}`, `${user_rut}`, `${workshop_office_employee_specialization}`, `${workshop_office_employee_experience}`])
+                res.json({ 'Response': 'Operation Success' })
+            } else {
+                res.json({ 'Response': 'Type user is not allowed' })
+            }
+
+        } catch (exception) {
         const errorSQL = exception.sqlMessage
         if (errorSQL.includes('foreign key')) {
             res.json({ 'Response': 'Rut not exist' })
@@ -480,7 +483,6 @@ router.get('/WorkshopOfficeList', async (req, res) => {
 
 router.post('/FileWorkShopOfficeComplaint', async (req, res) => {
     const { workshop_id, workshop_name, workshop_office_region, workshop_office_commune, workshop_office_address, complaint } = req.body.data
-    console.log(req.body.data)
     const response1 = await pool.query(`SELECT
         u.user_name,
         u.user_last_name,
@@ -514,6 +516,7 @@ router.post('/FileWorkShopOfficeComplaint', async (req, res) => {
         <p>CONFIDENCIALIDAD: La información contenida en este mensaje y/o en los archivos adjuntos es de carácter confidencial o privilegiada y está destinada al uso exclusivo del emisor y/o de la persona o entidad a quien va dirigida. Si usted no es el destinatario, cualquier almacenamiento, divulgación, distribución o copia de esta información está estrictamente prohibida y será sancionado por la ley. Si recibió este mensaje por error, por favor infórmenos inmediatamente respondiendo este mismo mensaje y borre éste y todos los archivos adjuntos. Gracias.</p><br/>
         <p>CONFIDENTIALITY NOTE: The information contained in this email, or any attachments to it, may be confidential and/or privileged and are for the intended addressee(s) only. Any unauthorized use, retention, disclosure, distribution or copying of this e-mail, or any information it contains, is prohibited and may be sanctioned by law. If you are not the intended recipient and received this message by mistake, please reply to sender and inform us, and then delete this mail and all attachments from your computer. Thank you.</p>`
     })
+    res.json({ 'Response': 'Operation Success' })
 })
 
 /*INSERT INTO workshop_ad (workshop_office_id, workshop_ad_bid, image_id,
@@ -555,7 +558,7 @@ router.post('/AddWorkshopOfficeAd', async (req, res) => {
             `0`,
             `inactive`
         ])
-    res.render("{ 'Response': 'Operation Success' }")
+    res.json({ 'Response': 'Operation Success' })
 })
 
 router.post('/WorkshopOfficeAdList', async (req, res) => {
@@ -568,7 +571,7 @@ router.post('/WorkshopOfficeAdList', async (req, res) => {
 })
 
 router.get('/CommuneList', async (req, res) => {
-    const response = await pool.query(`SELECT region_id, commune_name FROM commune`)
+    const response = await pool.query(`SELECT region_id, commune_name, id FROM commune`)
     if (response.length > 0) {
         res.json({ response })
     }
@@ -610,8 +613,31 @@ router.get('/img', async (req, res) => {
     workshop_office_ad o
     INNER JOIN image i
     ON i.id = o.image_id
+    WHERE o.workshop_office_ad_status = 'active'
     ORDER BY RAND() * workshop_office_ad_bid DESC
     LIMIT 1;`)
-    res.sendFile(`${response[0].image_name}`, { root: 'public/images' });
+    if(response[0].image_name !== undefined){
+        res.sendFile(`${response[0].image_name}`, { root: 'public/images' });
+    }
+  
 })
+
+router.get('/comprobeIMG', async (req, res) => {
+    const response = await pool.query(`SELECT
+    i.image_name,
+    o.workshop_office_id
+    FROM
+    workshop_office_ad o
+    INNER JOIN image i
+    ON i.id = o.image_id
+    ORDER BY RAND() * workshop_office_ad_bid DESC
+    LIMIT 1;`)
+    if (response.length > 0) {
+        res.json({ 'Response': 'Image Exist' })
+    } else {
+        res.json({ 'Response': 'Image Not Found' })
+    }
+
+})
+
 module.exports = router
