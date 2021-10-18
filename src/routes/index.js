@@ -557,6 +557,20 @@ router.post('/WorkshopOfficeAdList', async (req, res) => {
     else res.json({ 'Response': 'Ads not found' })
 })
 
+router.get('/CommuneList', async (req, res) => {
+    const response = await pool.query(`SELECT region_id, commune_name FROM commune`)
+    if (response.length > 0) {
+        res.json({ response })
+    }
+})
+
+router.get('/RegionList', async (req, res) => {
+    const response = await pool.query(`SELECT id, region_name FROM tutaller.region;`)
+    if (response.length > 0) {
+        res.json({ response })
+    }
+})
+
 router.post('/AdvertiseWorkShopOfficeAd', async (req, res) => {
     const resp = await pool.query(`SELECT workshop_office_ad_money_spent, workshop_office_ad_status from workshop_office_ad WHERE id = ?`, [`${req.body.data.id}`])
     let status = resp[0].workshop_office_ad_status
