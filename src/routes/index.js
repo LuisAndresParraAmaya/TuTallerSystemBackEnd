@@ -182,6 +182,8 @@ router.post('/DisableAccount', async (req, respuesta) => {
     bcryptjs.compare(user_password, response[0].user_password, async function (err, res) {
         if (res) {
             await pool.query(`UPDATE user SET user_status = ? WHERE user_rut = ?`, [`disabled`, `${user_rut}`])
+            await pool.query(`DROP EVENT IF EXISTS UserDisable${user_rut};`)
+            await pool.query(`CREATE EVENT UserDisable${user_rut} ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 month DO UPDATE user set user_status = 'deleted' WHERE user_rut = ${user_rut};`)
             respuesta.json({ 'Response': 'Operation Success' })
         } else {
             respuesta.json({ 'Response': 'Actual Password Failed' })
@@ -261,12 +263,20 @@ router.post('/RejectWorkshopPostulation', async (req, res) => {
 })
 
 router.post('/AddWorkshopOffice', async (req, res) => {
-    const { workshop_id, commune_id, workshop_suscription_id, workshop_office_address, workshop_office_phone, workshop_office_attention } = req.body.data
+    const { workshop_id, commune_id, workshop_office_suscription_id, workshop_office_address, workshop_office_phone, workshop_office_attention } = req.body.data
     let values = ''
     try {
-        const statement = `INSERT INTO workshop_office (workshop_id, commune_id, workshop_suscription_id, workshop_office_address, workshop_office_phone)
-    VALUES (?, ?, ?, ?, ?)`
-        const response = await pool.query(statement, [`${workshop_id}`, `${commune_id}`, `${workshop_suscription_id}`, `${workshop_office_address}`, `${workshop_office_phone}`])
+        console.log("antes del insert_into")
+        const statement = `INSERT INTO workshop_office (workshop_id, commune_id, 
+            workshop_suscription_id, workshop_office_address, 
+            workshop_office_phone)
+            VALUES (?, ?, ?, ?, ?)`
+        const response = await pool.query(
+            statement, 
+            [`${workshop_id}`, `${commune_id}`, 
+            `${workshop_office_suscription_id}`, `${workshop_office_address}`, 
+            `${workshop_office_phone}`])
+            console.log("PASANDO EL INSERTINTO")
         if (response.affectedRows > 0) {
             for (let i = 0; i < workshop_office_attention.length; i++) {
                 let day = workshop_office_attention[i].workshop_office_attention_day
@@ -352,7 +362,7 @@ router.post('/MyWorkShopOfficeList', async (req, res) => {
         INNER JOIN commune c
         ON c.id = w.commune_id
         INNER JOIN region r
-        ON r.id = c.id
+        ON r.id = c.region_id
         INNER JOIN workshop_office_suscription s
         ON s.id = w.workshop_suscription_id
         WHERE w.workshop_id = ?`, [`${workshop_id}`])
@@ -521,7 +531,7 @@ router.post('/AddWorkshopOfficeAd', async (req, res) => {
     // Proceso de guardado de ruta en la base de datos.
     const resSaveImage = await pool.query(`INSERT INTO IMAGE (image_name, image_path, image_ext) VALUES (?, ?, ?)`, [`${image.name}`, `public/images/${image.name}`, `${extension}`])
     await pool.query(`UPDATE image set image_name= "${resSaveImage.insertId}${image.name}", image_path= "${`public/images/${resSaveImage.insertId}${image.name}`}" WHERE id = ${resSaveImage.insertId}`)
-    fs.renameSync(path.resolve(image.path), path.resolve(`public/images/${resSaveImage.insertId}${image.name}.${extension}`));
+    fs.renameSync(path.resolve(image.path), path.resolve(`public/images/${resSaveImage.insertId}${image.name}`));
     const response = await pool.query(`INSERT INTO workshop_office_ad (
         workshop_office_id, 
         workshop_office_ad_bid, 
@@ -545,7 +555,7 @@ router.post('/AddWorkshopOfficeAd', async (req, res) => {
             `0`,
             `inactive`
         ])
-    res.json({ 'Response': 'Operation Success' })
+    res.render("{ 'Response': 'Operation Success' }")
 })
 
 router.post('/WorkshopOfficeAdList', async (req, res) => {
@@ -565,7 +575,7 @@ router.get('/CommuneList', async (req, res) => {
 })
 
 router.get('/RegionList', async (req, res) => {
-    const response = await pool.query(`SELECT id, region_name FROM tutaller.region;`)
+    const response = await pool.query(`SELECT id, region_name FROM region`)
     if (response.length > 0) {
         res.json({ response })
     }
@@ -588,8 +598,20 @@ router.post('/AdvertiseWorkShopOfficeAd', async (req, res) => {
 
     // Programar tarea de actualizacion tras 1 minuto.
     await pool.query(`DROP EVENT IF EXISTS workshopOfficeAd${req.body.data.id};`)
-    await pool.query(`CREATE EVENT workshopOfficeAd${req.body.data.id} ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 15 second DO UPDATE workshop_office_ad set workshop_office_ad_status = 'inactive', workshop_office_ad_bid = 0 WHERE id = ${req.body.data.id};`)
+    await pool.query(`CREATE EVENT workshopOfficeAd${req.body.data.id} ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 day DO UPDATE workshop_office_ad set workshop_office_ad_status = 'inactive', workshop_office_ad_bid = 0 WHERE id = ${req.body.data.id};`)
     res.json({ 'Response': 'Operation Success' })
 })
 
+router.get('/img', async (req, res) => {
+    const response = await pool.query(`SELECT
+    i.image_name,
+    o.workshop_office_id
+    FROM
+    workshop_office_ad o
+    INNER JOIN image i
+    ON i.id = o.image_id
+    ORDER BY RAND() * workshop_office_ad_bid DESC
+    LIMIT 1;`)
+    res.sendFile(`${response[0].image_name}`, { root: 'public/images' });
+})
 module.exports = router
