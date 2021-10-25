@@ -75,15 +75,15 @@ router.post('/Login', async (req, respuesta) => {
 
 router.post('/ModifyProfile', async (req, respuesta) => {
     //RECIBIR DESDE SESSION CLIENTE. -> USER RUT CURRENT
-    const { user_new_rut, user_rut, user_name, user_last_name, user_email, user_phone, user_password } = req.body.data
+    const { user_rut, user_name, user_last_name, user_email, user_phone, user_password } = req.body.data
     const response = await pool.query('SELECT * FROM `user` WHERE `user_rut` = ?', [`${user_rut}`]);
     bcryptjs.compare(user_password, response[0].user_password, async function (err, res) {
         if (res) {
             const response = await pool.query(`UPDATE user
-            SET user_rut = ?, user_name = ?, user_last_name = ?, user_email = ?, user_phone = ?
-            WHERE user_rut = ?`, [`${user_new_rut}`, `${user_name}`, `${user_last_name}`, `${user_email}`, `${user_phone}`, `${user_rut}`])
+            SET user_name = ?, user_last_name = ?, user_email = ?, user_phone = ?
+            WHERE user_rut = ?`, [`${user_name}`, `${user_last_name}`, `${user_email}`, `${user_phone}`, `${user_rut}`])
             if (response.affectedRows > 0) {
-                respuesta.json({ 'user_new_rut': user_new_rut })
+                respuesta.json({ 'Response': 'Operation Success' })
             } else {
                 respuesta.json({ 'Response': 'Operation Failed' })
             }
