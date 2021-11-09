@@ -493,6 +493,7 @@ router.post('/FileWorkShopOfficeComplaint', async (req, res) => {
         WHERE p.workshop_id = ?`, [`${workshop_id}`])
     const workshopadmin = response1[0]
     const response2 = await pool.query(`SELECT user_email FROM user WHERE user_type_id = 1`)
+    //TODO: Respuesta al e-mail de todos los administradores, no solo a uno
     const systemadmin = response2[0]
     // Enviar correo al administrador del taller y administradores del sistema
     await transporter.sendMail({
@@ -524,6 +525,52 @@ workshop_ad_name,
 workshop_ad_money_spent, workshop_ad_status) values (31, 40000, 1, 'Aprovecha el acelerón de las rebajas',
 0, 'unpublished'
 )*/
+
+router.post('/FileSupportTicket', async (req, res) => {
+    const { user_name, user_email, support_subject, support_message } = req.body.data
+    const response = await pool.query(`SELECT user_email FROM user WHERE user_type_id = 1`)
+    //TODO: Respuesta al e-mail de todos los administradores, no solo a uno
+    const systemadmin = response[0]
+    // Enviar correo de soporte a los administradores del sistema
+    await transporter.sendMail({
+        from: '"TuTaller" <luisandresparraamaya@gmail.com>',
+        to: systemadmin.user_email,
+        subject: support_subject,
+        html: `<p>Estimados administradores de TuTaller, han recibido el siguiente mensaje por parte del usuario ${user_name} con fines de soporte:</p>
+        
+        <p>${support_message}</p>
+
+        <p><b>Correo electrónico del usuario: ${user_email}</b></p>
+        
+        <b style="color: #166C9B">TuTaller</b><br/>
+        Santiago, Puente Alto<br/>
+        Pasaje Hotu Matua #1623<br/>
+        Teléfonos: +56 9 8440 2225, +56 9 9472 8410 y +56 9 9653 3164<br/>
+        www.tutaller.cl<br/><br/>
+        <hr/>
+        <p>CONFIDENCIALIDAD: La información contenida en este mensaje y/o en los archivos adjuntos es de carácter confidencial o privilegiada y está destinada al uso exclusivo del emisor y/o de la persona o entidad a quien va dirigida. Si usted no es el destinatario, cualquier almacenamiento, divulgación, distribución o copia de esta información está estrictamente prohibida y será sancionado por la ley. Si recibió este mensaje por error, por favor infórmenos inmediatamente respondiendo este mismo mensaje y borre éste y todos los archivos adjuntos. Gracias.</p><br/>
+        <p>CONFIDENTIALITY NOTE: The information contained in this email, or any attachments to it, may be confidential and/or privileged and are for the intended addressee(s) only. Any unauthorized use, retention, disclosure, distribution or copying of this e-mail, or any information it contains, is prohibited and may be sanctioned by law. If you are not the intended recipient and received this message by mistake, please reply to sender and inform us, and then delete this mail and all attachments from your computer. Thank you.</p>`
+    })
+    // Enviar correo al usuario que mandó el mensaje, con fines de acuso de recibo
+    await transporter.sendMail({
+        from: '"TuTaller" <luisandresparraamaya@gmail.com>',
+        to: user_email,
+        subject: 'Solicitud de Soporte TuTaller',
+        html: `<p>Estimado(a) ${user_name},</p>
+        
+        <p>Gracias por contactarte con nosotros! Tu consulta es importante para nosotros.<br/>
+        Vamos a revisar tu solicitud y te responderemos lo más pronto posible.<br/>
+        <b>Asunto: ${support_subject}</b>
+        </p>
+        
+        <b style="color: #166C9B">TuTaller</b><br/>
+        Santiago, Puente Alto<br/>
+        Pasaje Hotu Matua #1623<br/>
+        Teléfonos: +56 9 8440 2225, +56 9 9472 8410 y +56 9 9653 3164<br/>
+        www.tutaller.cl<br/><br/>`
+    })
+    res.json({ 'Response': 'Operation Success' })
+})
 
 router.post('/AddWorkshopOfficeAd', async (req, res) => {
     const { workshop_office_id,
