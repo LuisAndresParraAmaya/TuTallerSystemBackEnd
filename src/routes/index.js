@@ -687,4 +687,24 @@ router.get('/comprobeIMG', async (req, res) => {
 
 })
 
+router.get('/SubscriptionList', async (req, res) => {
+    const response = await pool.query(`SELECT 
+    s.id, 
+    s.name, 
+    s.price,
+    s.periodicity,
+    s.description, 
+    o.offer_discount, 
+    ROUND((s.price * o.offer_discount)/100, 2) AS offer_price
+    FROM 
+    workshop_office_suscription s
+    INNER JOIN offer o
+    ON s.offer_id = o.id
+    WHERE s.id NOT IN (1)`)
+    if (response.length > 0) {
+        res.json({ 'Response': 'Operation Success', 'SubscriptionList': response })
+    }
+    else res.json({ 'Response': 'Subscriptions not found' })
+})
+
 module.exports = router

@@ -165,6 +165,7 @@ CREATE TABLE IF NOT EXISTS `tutaller`.`workshop_office_suscription` (
   `offer_id` INT(11) NOT NULL,
   `name` VARCHAR(45) NOT NULL,
   `price` INT(11) NOT NULL,
+  `periodicity` VARCHAR(45) NOT NULL,
   `description` VARCHAR(99) NOT NULL,
   PRIMARY KEY (`id`),
   CONSTRAINT `fk_workshop_suscription_offer1`
@@ -1158,8 +1159,8 @@ INSERT INTO `tutaller`.`commune` (`region_id`, `commune_name`) VALUES ('16','Nat
 INSERT INTO `tutaller`.`commune` (`region_id`, `commune_name`) VALUES ('16','Torres del Paine');
 
 INSERT INTO `offer` (`id`,`offer_name`,`offer_discount`) VALUES (1,'none',0);
-INSERT INTO `workshop_office_suscription` (`id`,`offer_id`,`name`,`price`,`description`) VALUES (1,1,'unsubscribed',0,'without subscription');
-INSERT INTO `workshop_office_suscription` (`id`,`offer_id`,`name`,`price`,`description`) VALUES (2,1,'basic',3533,'monthly basic plan');
+INSERT INTO `workshop_office_suscription` (`id`,`offer_id`,`name`,`price`,`periodicity`,`description`) VALUES (1,1,'unsubscribed',0,'none','without subscription');
+INSERT INTO `workshop_office_suscription` (`id`,`offer_id`,`name`,`price`,`periodicity`,`description`) VALUES (2,1,'basic',3533,'monthly','monthly basic plan');
 
 
 SET SQL_MODE=@OLD_SQL_MODE;
