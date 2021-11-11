@@ -695,7 +695,7 @@ router.get('/SubscriptionList', async (req, res) => {
     s.periodicity,
     s.description, 
     o.offer_discount, 
-    ROUND((s.price * o.offer_discount)/100, 2) AS offer_price
+    ROUND(s.price-(s.price * (o.offer_discount/100)), 2) AS offer_price
     FROM 
     workshop_office_suscription s
     INNER JOIN offer o
