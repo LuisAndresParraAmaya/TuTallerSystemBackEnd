@@ -440,7 +440,24 @@ router.post('/WorkshopOfficeEmployeeList', async (req, res) => {
 
 router.post('/WorkshopOfficeServiceList', async (req, res) => {
     const { workshop_office_id } = req.body.data
-    const response = await pool.query(`SELECT * FROM workshop_office_service WHERE workshop_office_id = ?`, [`${workshop_office_id}`])
+    const response = await pool.query(`SELECT 
+    s.id,
+    s.workshop_office_id,
+    s.workshop_office_service_name,
+    s.workshop_office_service_price,
+    s.workshop_office_service_estimated_time,
+    s.workshop_office_service_description,
+    s.offer_id,
+    o.offer_name,
+    o.offer_discount,
+    o.offer_valid_until_date,
+    o.offer_valid_until_time,
+    ROUND(s.workshop_office_service_price-(s.workshop_office_service_price * (o.offer_discount/100)), 2) AS offer_price
+    FROM 
+    workshop_office_service s
+    INNER JOIN offer o
+    ON s.offer_id = o.id
+    WHERE workshop_office_id = ?`, [`${workshop_office_id}`])
     if (response.length > 0) {
         res.json({ response })
     }
@@ -693,8 +710,12 @@ router.get('/SubscriptionList', async (req, res) => {
     s.name, 
     s.price,
     s.periodicity,
-    s.description, 
-    o.offer_discount, 
+    s.description,
+    s.offer_id,
+    o.offer_name,
+    o.offer_discount,
+    o.offer_valid_until_date,
+    o.offer_valid_until_time,
     ROUND(s.price-(s.price * (o.offer_discount/100)), 2) AS offer_price
     FROM 
     workshop_office_suscription s
@@ -705,6 +726,47 @@ router.get('/SubscriptionList', async (req, res) => {
         res.json({ 'Response': 'Operation Success', 'SubscriptionList': response })
     }
     else res.json({ 'Response': 'Subscriptions not found' })
+})
+
+router.post('/ActivateOffer', async (req, res) => {
+    const { offer, offer_item_id_list } = req.body.data
+    let itemTable = ''
+    if (offer.offer_type == 'subscriptionPlan') itemTable = 'workshop_office_suscription'
+    else if (offer.offer_type == 'workshopOfficeService') itemTable = 'workshop_office_service'
+    const response = await pool.query(`SELECT id FROM ${itemTable} WHERE id IN (${offer_item_id_list}) AND offer_id = 1`)
+    //Validates that the selected items doesn't have offers
+    if (response.length == offer_item_id_list.length) {
+        const statement2 = `INSERT INTO offer (offer_name, offer_discount, offer_valid_until_date, offer_valid_until_time) VALUES (?, ?, ?, ?)`
+        const response2 = await pool.query (
+            statement2,
+            [`${offer.offer_name}`, `${offer.offer_discount}`, `${offer.offer_valid_until_date}`, `${offer.offer_valid_until_time}`]
+        )
+        //Returns the ID from the last INSERT (in this case, the offer)
+        const response3 = await pool.query('SELECT LAST_INSERT_ID() AS autoincrementID')
+        if (response2.affectedRows > 0) {
+            const statement4 = `UPDATE ${itemTable} SET offer_id = ? WHERE id IN (${offer_item_id_list})`
+            const response4 = await pool.query(
+                statement4,
+                [`${response3[0].autoincrementID}`]//It is the ID from the created offer
+            )
+            if (response4.affectedRows > 0) {
+                let eventId = itemTable + offer_item_id_list.toString().replace(/,/g, '')//Creates an ID for the event based on the item's table and the ID's for the items
+                let offerValidUntilDatetime = offer.offer_valid_until_date + ' ' + offer.offer_valid_until_time
+                const response5 = await pool.query(`SELECT CURRENT_TIMESTAMP`)
+                //If the server time is greater than the selected time in the client side, then do the deactivate the offer immediately to avoid a conflict when scheduling the event
+                if (response5[0].CURRENT_TIMESTAMP >= new Date(offerValidUntilDatetime)) await pool.query(`UPDATE ${itemTable} SET offer_id = 1 WHERE id IN (${offer_item_id_list})`)
+                else {
+                    await pool.query(`DROP EVENT IF EXISTS DeactivateOffer${eventId}`)
+                    const statement6 = `CREATE EVENT DeactivateOffer${eventId} ON SCHEDULE AT ? DO UPDATE ${itemTable} SET offer_id = 1 WHERE id IN (${offer_item_id_list})`
+                    await pool.query(
+                        statement6,
+                        [`${offerValidUntilDatetime}`]
+                    )
+                }
+                res.json({ Response: 'Operation Success' })
+            }
+        }
+    } else res.json({ Response: 'One of the offers are already activated' })
 })
 
 module.exports = router
