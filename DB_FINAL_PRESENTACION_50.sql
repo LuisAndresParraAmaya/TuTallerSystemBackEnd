@@ -100,6 +100,8 @@ CREATE TABLE IF NOT EXISTS `tutaller`.`offer` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `offer_name` VARCHAR(45) NOT NULL,
   `offer_discount` TINYINT(100) NOT NULL,
+  `offer_valid_until_date` DATE NOT NULL,
+  `offer_valid_until_time` TIME NOT NULL,
   PRIMARY KEY (`id`))
 ENGINE = InnoDB
 AUTO_INCREMENT = 2
