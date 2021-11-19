@@ -704,6 +704,7 @@ router.get('/comprobeIMG', async (req, res) => {
 
 })
 
+//Gets the subscription list, also making sure to its offer information such as discounts
 router.get('/SubscriptionList', async (req, res) => {
     const response = await pool.query(`SELECT 
     s.id, 
@@ -728,6 +729,7 @@ router.get('/SubscriptionList', async (req, res) => {
     else res.json({ 'Response': 'Subscriptions not found' })
 })
 
+//Adds and activates an offer for a single/multiple suscription plan or workshop office service, where at the end it creates an event/MySQL cron to deactivate the offer according to the date that the user inserted
 router.post('/ActivateOffer', async (req, res) => {
     const { offer, offer_item_id_list } = req.body.data
     let itemTable = ''
@@ -767,6 +769,33 @@ router.post('/ActivateOffer', async (req, res) => {
             }
         }
     } else res.json({ Response: 'One of the offers are already activated' })
+})
+
+//Gets the evaluation list from a determined workshop office, where it only needs the id from that office. It also gets the information from the user, such as its Rut, name and last name
+router.post('/WorkshopOfficeEvaluationList', async (req, res) => {
+    const { workshop_office_id } = req.body.data
+    const response = await pool.query(`SELECT 
+    e.id AS workshop_office_evaluation_id,
+    e.workshop_evaluation_rating,
+    e.workshop_evaluation_review,
+    e.user_user_rut,
+    u.user_name,
+    u.user_last_name
+    FROM 
+    workshop_office_evaluation e
+    INNER JOIN user u
+    ON e.user_user_rut = u.user_rut
+    WHERE workshop_office_id = ?`, [`${workshop_office_id}`])
+    if (response.length > 0) res.json({ 'Response': 'Operation Success', 'WorkshopOfficeEvaluationList': response })
+    else res.json({ 'Response': 'Evaluations not found' })
+})
+
+//Deletes a workshop office evaluation from user's POV, where it needs the evaluation id and the Rut from the currently logged in user
+router.post('/DeleteWorkshopOfficeEvaluation', async (req, res) => {
+    const { id, user_user_rut } = req.body.data
+    const response = await pool.query(`DELETE FROM workshop_office_evaluation WHERE id = ? AND user_user_rut = ?`, [`${id}`, `${user_user_rut}`])
+    if (response.affectedRows > 0) res.json({ 'Response': 'Operation Success' })
+    else res.json({'Response': 'Evaluation not found'})
 })
 
 module.exports = router
