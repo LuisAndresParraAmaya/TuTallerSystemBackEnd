@@ -498,6 +498,38 @@ router.get('/WorkshopOfficeList', async (req, res) => {
     else res.json({ 'Response': 'Offices not found' })
 })
 
+//Get the general information from a workshop office. It requires the workshop office id
+router.post('/WorkshopOffice', async (req, res) => {
+    const { workshop_office_id } = req.body.data
+
+    const response = await pool.query(`SELECT
+    o.id AS workshop_office_id,
+    w.workshop_name,
+    w.workshop_number,
+    w.workshop_description,
+    o.workshop_office_phone,
+    c.commune_name AS workshop_office_commune,
+    r.region_name AS workshop_office_region,
+    o.workshop_office_address,
+    ROUND(AVG(COALESCE(e.workshop_evaluation_rating, 0)), 1) AS workshop_office_average_rating,
+    COUNT(e.id) AS workshop_office_total_evaluations
+    FROM
+    workshop_office o
+    INNER JOIN workshop w
+    ON w.id = o.workshop_id
+    INNER JOIN commune c
+    ON o.commune_id = c.id
+    INNER JOIN region r
+    ON c.region_id = r.id
+    LEFT OUTER JOIN workshop_office_evaluation e
+    ON o.id = e.workshop_office_id
+    WHERE o.id = ?`, [`${workshop_office_id}`])
+    if (response.length > 0) {
+        res.json({ 'Response': 'Operation Success', 'WorkshopOffice': response })
+    }
+    else res.json({ 'Response': 'Office not found' })
+})
+
 router.post('/FileWorkShopOfficeComplaint', async (req, res) => {
     const { workshop_id, workshop_name, workshop_office_region, workshop_office_commune, workshop_office_address, complaint } = req.body.data
     const response1 = await pool.query(`SELECT
@@ -795,6 +827,37 @@ router.post('/DeleteWorkshopOfficeEvaluation', async (req, res) => {
     const { id, user_user_rut } = req.body.data
     const response = await pool.query(`DELETE FROM workshop_office_evaluation WHERE id = ? AND user_user_rut = ?`, [`${id}`, `${user_user_rut}`])
     if (response.affectedRows > 0) res.json({ 'Response': 'Operation Success' })
+    else res.json({'Response': 'Evaluation not found'})
+})
+
+//Moderates a workshop office evaluation by deleting it and sending an e-mail with a moderate reason to the user that made that evaluation
+router.post('/ModerateWorkshopOfficeEvaluation', async (req, res) => {
+    const { id, user_user_rut, moderate_reason, workshop_evaluation_rating, workshop_evaluation_review, workshop_name, workshop_office_region, workshop_office_commune, workshop_office_address } = req.body.data
+    const response = await pool.query(`DELETE FROM workshop_office_evaluation WHERE id = ? AND user_user_rut = ?`, [`${id}`, `${user_user_rut}`])
+    if (response.affectedRows > 0) {
+        const response2 = await pool.query(`SELECT user_email FROM user WHERE user_rut = ?`, [`${user_user_rut}`])
+        await transporter.sendMail({
+            from: '"TuTaller" <luisandresparraamaya@gmail.com>',
+            to: response2[0].user_email,
+            subject: 'Tu evaluación ha sido moderada',
+            html: `<p>Estimado usuario de TuTaller, una de tus evaluaciones que has realizado al taller ${workshop_name} para la sucursal proveniente de ${workshop_office_address}, de la comuna de ${workshop_office_commune}, ${workshop_office_region} ha sido eliminada por el siguiente motivo:</p>
+            
+            <p>${moderate_reason}</p>
+    
+            <p><b>La reseña de la evaluación que ha sido moderada:</b> ${workshop_evaluation_review}</p>
+            <p><b>La calificación de la evaluación que ha sido moderada:</b> ${workshop_evaluation_rating}</p>
+            
+            <b style="color: #166C9B">TuTaller</b><br/>
+            Santiago, Puente Alto<br/>
+            Pasaje Hotu Matua #1623<br/>
+            Teléfonos: +56 9 8440 2225, +56 9 9472 8410 y +56 9 9653 3164<br/>
+            www.tutaller.cl<br/><br/>
+            <hr/>
+            <p>CONFIDENCIALIDAD: La información contenida en este mensaje y/o en los archivos adjuntos es de carácter confidencial o privilegiada y está destinada al uso exclusivo del emisor y/o de la persona o entidad a quien va dirigida. Si usted no es el destinatario, cualquier almacenamiento, divulgación, distribución o copia de esta información está estrictamente prohibida y será sancionado por la ley. Si recibió este mensaje por error, por favor infórmenos inmediatamente respondiendo este mismo mensaje y borre éste y todos los archivos adjuntos. Gracias.</p><br/>
+            <p>CONFIDENTIALITY NOTE: The information contained in this email, or any attachments to it, may be confidential and/or privileged and are for the intended addressee(s) only. Any unauthorized use, retention, disclosure, distribution or copying of this e-mail, or any information it contains, is prohibited and may be sanctioned by law. If you are not the intended recipient and received this message by mistake, please reply to sender and inform us, and then delete this mail and all attachments from your computer. Thank you.</p>`
+        })
+        res.json({ 'Response': 'Operation Success' })
+    }
     else res.json({'Response': 'Evaluation not found'})
 })
 
