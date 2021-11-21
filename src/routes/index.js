@@ -861,4 +861,79 @@ router.post('/ModerateWorkshopOfficeEvaluation', async (req, res) => {
     else res.json({'Response': 'Evaluation not found'})
 })
 
+//Get the workshop office work list associated to a user (it needs that user's Rut)
+router.post('/WorkshopOfficeWorkList', async (req, res) => {
+    const { user_rut } = req.body.data
+    const response = await pool.query(`SELECT 
+    ow.id AS workshop_office_work_id,
+    ow.workshop_office_work_status,
+    s.workshop_office_service_name,
+    w.workshop_name,
+    ow.employee_id,
+    e.user_rut AS employee_rut,
+    ue.user_name AS employee_name,
+    ue.user_last_name AS employee_last_name,
+    uc.user_rut AS customer_rut,
+    uc.user_name AS customer_name,
+    uc.user_last_name AS customer_last_name,
+    o.workshop_office_address,
+    c.commune_name AS workshop_office_commune,
+    r.region_name AS workshop_office_region
+    FROM 
+    workshop_office_work ow
+    INNER JOIN workshop_office_employee e
+    ON ow.employee_id = e.id
+    INNER JOIN workshop_office_service s
+    ON ow.workshop_office_service_id = s.id
+    INNER JOIN user ue
+    ON e.user_rut = ue.user_rut
+    INNER JOIN user uc
+    ON ow.user_user_rut = uc.user_rut
+    INNER JOIN workshop_office o
+    ON o.id = s.workshop_office_id
+    INNER JOIN workshop w
+    ON o.workshop_id = w.id
+    INNER JOIN commune c
+    ON o.commune_id = c.id
+    INNER JOIN region r
+    ON c.region_id = r.id
+    WHERE ow.user_user_rut = ? OR e.user_rut = ?`, [`${user_rut}`, `${user_rut}`])
+    if (response.length > 0) res.json({ 'Response': 'Operation Success', 'WorkshopOfficeWorkList': response })
+    else res.json({ 'Response': 'Workshop office works not found' })
+})
+
+//Gets the workshop office work milestone list, requiring the workshop office work id
+router.post('/WorkshopOfficeWorkMilestoneList', async (req, res) => {
+    const { workshop_office_work_id } = req.body.data
+    const response = await pool.query(`SELECT * FROM workshop_office_work_milestone WHERE workshop_office_work_id = ?`, [workshop_office_work_id])
+    if (response.length > 0) res.json({ 'Response': 'Operation Success', 'WorkshopOfficeWorkMilestoneList': response })
+    else res.json({ 'Response': 'Work milestones not found' })
+})
+
+//Gets the workshop office work advances that the technician have sent. It requires the workshop office work id
+router.post('/WorkshopOfficeWorkAdvanceList', async (req, res) => {
+    const { workshop_office_work_id } = req.body.data
+})
+
+//Completes the current workshop office work (marks it as complete) and procceds to mark the next milestone in a 'working' state
+router.post('/CompleteWorkshopOfficeWorkMilestone', async (req, res) => {
+    const { workshop_office_work_milestone_id, workshop_office_work_id } = req.body.data
+    const response = await pool.query(`UPDATE workshop_office_work_milestone SET workshop_office_work_milestone_status = 'completed' WHERE id = ?`, [workshop_office_work_milestone_id])
+    if (response.affectedRows > 0) {
+        const response2 = await pool.query(`UPDATE workshop_office_work_milestone 
+        SET workshop_office_work_milestone_status = 'working' 
+        WHERE id = (SELECT id FROM (SELECT id FROM workshop_office_work_milestone WHERE workshop_office_work_id = ? AND workshop_office_work_milestone_status = 'pending' LIMIT 1) AS mid)`, [workshop_office_work_id])
+        if (response2.affectedRows > 0) res.json({ 'Response': 'Operation Success' })
+        else res.json({ 'Response': 'No workshop milestone is pending' })
+    } else res.json({ 'Response': 'Workshop milestone not found' })
+})
+
+//Inserts the vehicle technical report, considering a determined workshop office work
+router.post('/AddWorkshopOfficeWorkTechnicalReport', async (req, res) => {
+    const { workshop_office_work_id, office_work_technical_report_km, office_work_technical_report_ppu, office_work_technical_report_fuel_type, office_work_technical_report_color, office_work_technical_report_engine, office_work_technical_report_model, office_work_technical_report_brand, office_work_technical_report_chassis, office_work_technical_report_description } = req.body.data
+    const response = await pool.query(`INSERT INTO office_work_technical_report (workshop_office_work_id, office_work_technical_report_km, office_work_technical_report_ppu, office_work_technical_report_fuel_type, office_work_technical_report_color, office_work_technical_report_engine, office_work_technical_report_model, office_work_technical_report_brand, office_work_technical_report_chassis, office_work_technical_report_description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [`${workshop_office_work_id}`, `${office_work_technical_report_km}`, `${office_work_technical_report_ppu}`, `${office_work_technical_report_fuel_type}`, `${office_work_technical_report_color}`, `${office_work_technical_report_engine}`, `${office_work_technical_report_model}`, `${office_work_technical_report_brand}`, `${office_work_technical_report_chassis}`, `${office_work_technical_report_description}` ])
+    if (response.affectedRows > 0) res.json({ 'Response': 'Operation Success' })
+    else res.json({ 'Response': 'Operation Failed' })
+})
+
 module.exports = router
