@@ -270,15 +270,9 @@ DEFAULT CHARACTER SET = utf8;
 CREATE TABLE IF NOT EXISTS `tutaller`.`workshop_office_work` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `workshop_office_service_id` INT(11) NOT NULL,
-  `employee_id` INT(11) NOT NULL,
   `user_user_rut` INT(11) NOT NULL,
   `workshop_office_work_status` VARCHAR(45) NOT NULL,
   PRIMARY KEY (`id`),
-  CONSTRAINT `fk_workshop_office_work_employee1`
-    FOREIGN KEY (`employee_id`)
-    REFERENCES `tutaller`.`workshop_office_employee` (`id`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
   CONSTRAINT `fk_workshop_office_work_user1`
     FOREIGN KEY (`user_user_rut`)
     REFERENCES `tutaller`.`user` (`user_rut`)
