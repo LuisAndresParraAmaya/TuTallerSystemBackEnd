@@ -865,14 +865,11 @@ router.post('/ModerateWorkshopOfficeEvaluation', async (req, res) => {
 router.post('/WorkshopOfficeWorkList', async (req, res) => {
     const { user_rut } = req.body.data
     const response = await pool.query(`SELECT 
-    ow.id AS workshop_office_work_id,
+	ow.id AS workshop_office_work_id,
+    o.id AS workshop_office_id,
     ow.workshop_office_work_status,
     s.workshop_office_service_name,
     w.workshop_name,
-    ow.employee_id,
-    e.user_rut AS employee_rut,
-    ue.user_name AS employee_name,
-    ue.user_last_name AS employee_last_name,
     uc.user_rut AS customer_rut,
     uc.user_name AS customer_name,
     uc.user_last_name AS customer_last_name,
@@ -881,25 +878,37 @@ router.post('/WorkshopOfficeWorkList', async (req, res) => {
     r.region_name AS workshop_office_region
     FROM 
     workshop_office_work ow
-    INNER JOIN workshop_office_employee e
-    ON ow.employee_id = e.id
-    INNER JOIN workshop_office_service s
+    LEFT OUTER JOIN workshop_office_service s
     ON ow.workshop_office_service_id = s.id
-    INNER JOIN user ue
-    ON e.user_rut = ue.user_rut
-    INNER JOIN user uc
-    ON ow.user_user_rut = uc.user_rut
-    INNER JOIN workshop_office o
+    LEFT OUTER JOIN workshop_office o
     ON o.id = s.workshop_office_id
-    INNER JOIN workshop w
+    LEFT OUTER JOIN workshop_office_employee e
+    ON e.workshop_office_id = o.id
+    LEFT OUTER JOIN user uc
+    ON ow.user_user_rut = uc.user_rut
+    LEFT OUTER JOIN user ue
+    ON e.user_rut = ue.user_rut
+    LEFT OUTER JOIN workshop w
     ON o.workshop_id = w.id
-    INNER JOIN commune c
+	LEFT OUTER JOIN commune c
     ON o.commune_id = c.id
-    INNER JOIN region r
+    LEFT OUTER JOIN region r
     ON c.region_id = r.id
-    WHERE ow.user_user_rut = ? OR e.user_rut = ?`, [`${user_rut}`, `${user_rut}`])
+    WHERE ow.user_user_rut = ? OR e.user_rut = ?
+    GROUP BY ow.id;`, [`${user_rut}`, `${user_rut}`])
     if (response.length > 0) res.json({ 'Response': 'Operation Success', 'WorkshopOfficeWorkList': response })
     else res.json({ 'Response': 'Workshop office works not found' })
+})
+
+//Add a workshop office work in the 'working' status, also add its correspondent milestones. It requires the service id that will be worked on and also the customer rut
+router.post('/AddWorkshopOfficeWork', async (req, res) => {
+    const { workshop_office_service_id, user_user_rut } = req.body.data
+    const response = await pool.query(`INSERT INTO workshop_office_work (workshop_office_service_id, user_user_rut, workshop_office_work_status) VALUES (?, ?, 'working')`, [`${workshop_office_service_id}`, `${user_user_rut}`])
+    if (response.affectedRows > 0) {
+        const response2 = await pool.query(`INSERT INTO workshop_office_work_milestone (workshop_office_work_id, workshop_office_work_milestone_name, workshop_office_work_milestone_description, workshop_office_work_milestone_status) VALUES (LAST_INSERT_ID(), 'Recepción del vehículo', 'El cliente debe llevar su vehículo a la sucursal automotriz.', 'working'), (LAST_INSERT_ID(), 'Inspección del vehículo', 'El técnico realizará una ficha técnica al vehículo del cliente.', 'pending'), (LAST_INSERT_ID(), 'Realización del servicio', 'El técnico está trabajando en el servicio automotriz acordado.', 'pending'), (LAST_INSERT_ID(), 'Retiro del vehículo', 'El cliente debe ir a retirar su vehículo a la sucursal automotriz.', 'pending')`)
+        if (response2.affectedRows > 0) res.json({ 'Response': 'Operation Success' })
+        else res.json({ 'Response': 'Milestone adding failed' })
+    } else res.json({ 'Response': 'Invalid user rut or service' })
 })
 
 //Gets the workshop office work milestone list, requiring the workshop office work id
