@@ -489,7 +489,7 @@ router.get('/WorkshopOfficeList', async (req, res) => {
     ON c.region_id = r.id
     LEFT OUTER JOIN workshop_office_evaluation e
     ON o.id = e.workshop_office_id
-    WHERE workshop_suscription_id = 1
+    WHERE workshop_suscription_id NOT IN (1)
     GROUP BY o.id
     ORDER BY workshop_office_average_rating DESC`)
     if (response.length > 0) {
@@ -770,35 +770,19 @@ router.post('/ActivateOffer', async (req, res) => {
     const response = await pool.query(`SELECT id FROM ${itemTable} WHERE id IN (${offer_item_id_list}) AND offer_id = 1`)
     //Validates that the selected items doesn't have offers
     if (response.length == offer_item_id_list.length) {
-        const statement2 = `INSERT INTO offer (offer_name, offer_discount, offer_valid_until_date, offer_valid_until_time) VALUES (?, ?, ?, ?)`
-        const response2 = await pool.query (
-            statement2,
-            [`${offer.offer_name}`, `${offer.offer_discount}`, `${offer.offer_valid_until_date}`, `${offer.offer_valid_until_time}`]
-        )
-        //Returns the ID from the last INSERT (in this case, the offer)
-        const response3 = await pool.query('SELECT LAST_INSERT_ID() AS autoincrementID')
+        const response2 = await pool.query (`INSERT INTO offer (offer_name, offer_discount, offer_valid_until_date, offer_valid_until_time) VALUES (?, ?, ?, ?)`, [`${offer.offer_name}`, `${offer.offer_discount}`, `${offer.offer_valid_until_date}`, `${offer.offer_valid_until_time}`])
         if (response2.affectedRows > 0) {
-            const statement4 = `UPDATE ${itemTable} SET offer_id = ? WHERE id IN (${offer_item_id_list})`
-            const response4 = await pool.query(
-                statement4,
-                [`${response3[0].autoincrementID}`]//It is the ID from the created offer
-            )
-            if (response4.affectedRows > 0) {
-                let eventId = itemTable + offer_item_id_list.toString().replace(/,/g, '')//Creates an ID for the event based on the item's table and the ID's for the items
-                let offerValidUntilDatetime = offer.offer_valid_until_date + ' ' + offer.offer_valid_until_time
-                const response5 = await pool.query(`SELECT CURRENT_TIMESTAMP`)
-                //If the server time is greater than the selected time in the client side, then do the deactivate the offer immediately to avoid a conflict when scheduling the event
-                if (response5[0].CURRENT_TIMESTAMP >= new Date(offerValidUntilDatetime)) await pool.query(`UPDATE ${itemTable} SET offer_id = 1 WHERE id IN (${offer_item_id_list})`)
-                else {
-                    await pool.query(`DROP EVENT IF EXISTS DeactivateOffer${eventId}`)
-                    const statement6 = `CREATE EVENT DeactivateOffer${eventId} ON SCHEDULE AT ? DO UPDATE ${itemTable} SET offer_id = 1 WHERE id IN (${offer_item_id_list})`
-                    await pool.query(
-                        statement6,
-                        [`${offerValidUntilDatetime}`]
-                    )
-                }
-                res.json({ Response: 'Operation Success' })
+            await pool.query(`UPDATE ${itemTable} SET offer_id = ? WHERE id IN (${offer_item_id_list})`, [`${response2.insertId}`])
+            let eventId = itemTable + offer_item_id_list.toString().replace(/,/g, '')//Creates an ID for the event based on the item's table and the ID's for the items
+            let offerValidUntilDatetime = offer.offer_valid_until_date + ' ' + offer.offer_valid_until_time
+            const response3 = await pool.query(`SELECT CURRENT_TIMESTAMP`)
+            //If the server time is greater than the selected time in the client side, then do the deactivate the offer immediately to avoid a conflict when scheduling the event
+            if (response3[0].CURRENT_TIMESTAMP >= new Date(offerValidUntilDatetime)) await pool.query(`UPDATE ${itemTable} SET offer_id = 1 WHERE id IN (${offer_item_id_list})`)
+            else {
+                await pool.query(`DROP EVENT IF EXISTS DeactivateOffer${eventId}`)
+                await pool.query(`CREATE EVENT DeactivateOffer${eventId} ON SCHEDULE AT ? DO UPDATE ${itemTable} SET offer_id = 1 WHERE id IN (${offer_item_id_list})`, [`${offerValidUntilDatetime}`])
             }
+            res.json({ Response: 'Operation Success' })
         }
     } else res.json({ Response: 'One of the offers are already activated' })
 })
@@ -905,7 +889,13 @@ router.post('/AddWorkshopOfficeWork', async (req, res) => {
     const { workshop_office_service_id, user_user_rut } = req.body.data
     const response = await pool.query(`INSERT INTO workshop_office_work (workshop_office_service_id, user_user_rut, workshop_office_work_status) VALUES (?, ?, 'working')`, [`${workshop_office_service_id}`, `${user_user_rut}`])
     if (response.affectedRows > 0) {
-        const response2 = await pool.query(`INSERT INTO workshop_office_work_milestone (workshop_office_work_id, workshop_office_work_milestone_name, workshop_office_work_milestone_description, workshop_office_work_milestone_status) VALUES (LAST_INSERT_ID(), 'Recepción del vehículo', 'El cliente debe llevar su vehículo a la sucursal automotriz.', 'working'), (LAST_INSERT_ID(), 'Inspección del vehículo', 'El técnico realizará una ficha técnica al vehículo del cliente.', 'pending'), (LAST_INSERT_ID(), 'Realización del servicio', 'El técnico está trabajando en el servicio automotriz acordado.', 'pending'), (LAST_INSERT_ID(), 'Retiro del vehículo', 'El cliente debe ir a retirar su vehículo a la sucursal automotriz.', 'pending')`)
+        const response2 = await pool.query(`INSERT INTO workshop_office_work_milestone (workshop_office_work_id, workshop_office_work_milestone_name, workshop_office_work_milestone_description, workshop_office_work_milestone_status) 
+        VALUES 
+        (?, 'Recepción del vehículo', 'El cliente debe llevar su vehículo a la sucursal automotriz.', 'working'), 
+        (?, 'Inspección del vehículo', 'El técnico realizará una ficha técnica al vehículo del cliente.', 'pending'), 
+        (?, 'Realización del servicio', 'El técnico está trabajando en el servicio automotriz acordado.', 'pending'), 
+        (?, 'Retiro del vehículo', 'El cliente debe ir a retirar su vehículo a la sucursal automotriz.', 'pending')`, 
+        [`${response.insertId}`, `${response.insertId}`, `${response.insertId}`, `${response.insertId}`])
         if (response2.affectedRows > 0) res.json({ 'Response': 'Operation Success' })
         else res.json({ 'Response': 'Milestone adding failed' })
     } else res.json({ 'Response': 'Invalid user rut or service' })
@@ -922,6 +912,7 @@ router.post('/WorkshopOfficeWorkMilestoneList', async (req, res) => {
 //Gets the workshop office work advances that the technician have sent. It requires the workshop office work id
 router.post('/WorkshopOfficeWorkAdvanceList', async (req, res) => {
     const { workshop_office_work_id } = req.body.data
+
 })
 
 //Completes the current workshop office work (marks it as complete) and procceds to mark the next milestone in a 'working' state
