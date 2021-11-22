@@ -945,4 +945,12 @@ router.post('/AddWorkshopOfficeWorkTechnicalReport', async (req, res) => {
     else res.json({ 'Response': 'Operation Failed' })
 })
 
+//Get the workshop office technical report. It requires the workshop office work id
+router.post('/WorkshopOfficeWorkTechnicalReport', async (req, res) => {
+    const { workshop_office_work_id } = req.body.data
+    const response = await pool.query(`SELECT * FROM office_work_technical_report WHERE workshop_office_work_id = ?`, [`${workshop_office_work_id}`])
+    if (response.length > 0) res.json({ 'Response': 'Operation Success', 'WorkshopOfficeWorkTechnicalReport': response })
+    else res.json({ 'Response': 'Technical report not found' })
+})
+
 module.exports = router
