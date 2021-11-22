@@ -542,13 +542,13 @@ router.post('/FileWorkShopOfficeComplaint', async (req, res) => {
         WHERE p.workshop_id = ?`, [`${workshop_id}`])
     const workshopadmin = response1[0]
     const response2 = await pool.query(`SELECT user_email FROM user WHERE user_type_id = 1`)
-    //TODO: Respuesta al e-mail de todos los administradores, no solo a uno
-    const systemadmin = response2[0]
+    //E-mail de todos los administradores
+    const systemAdminsEmails = response2.map(element => Object.values(element))
     // Enviar correo al administrador del taller y administradores del sistema
     await transporter.sendMail({
         from: '"TuTaller" <luisandresparraamaya@gmail.com>',
         to: workshopadmin.user_email,
-        cc: systemadmin.user_email,
+        cc: systemAdminsEmails,
         subject: `Reclamo hacia una sucursal del taller ${workshop_name}`,
         html: `<p>Estimado administrador del taller ${workshop_name}, ${workshopadmin.user_name} ${workshopadmin.user_last_name}, y administradores de TuTaller, este 
         reclamo va dirigido hacia la sucursal proveniente de ${workshop_office_address}, de la comuna de ${workshop_office_commune}, ${workshop_office_region}.</p><br/>
@@ -578,12 +578,12 @@ workshop_ad_money_spent, workshop_ad_status) values (31, 40000, 1, 'Aprovecha el
 router.post('/FileSupportTicket', async (req, res) => {
     const { user_name, user_email, support_subject, support_message } = req.body.data
     const response = await pool.query(`SELECT user_email FROM user WHERE user_type_id = 1`)
-    //TODO: Respuesta al e-mail de todos los administradores, no solo a uno
-    const systemadmin = response[0]
+    //E-mail de todos los administradores
+    const systemAdminsEmails = response.map(element => Object.values(element))
     // Enviar correo de soporte a los administradores del sistema
     await transporter.sendMail({
         from: '"TuTaller" <luisandresparraamaya@gmail.com>',
-        to: systemadmin.user_email,
+        to: systemAdminsEmails,
         subject: support_subject,
         html: `<p>Estimados administradores de TuTaller, han recibido el siguiente mensaje por parte del usuario ${user_name} con fines de soporte:</p>
         
