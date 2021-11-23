@@ -912,7 +912,32 @@ router.post('/WorkshopOfficeWorkMilestoneList', async (req, res) => {
 //Gets the workshop office work advances that the technician have sent. It requires the workshop office work id
 router.post('/WorkshopOfficeWorkAdvanceList', async (req, res) => {
     const { workshop_office_work_id } = req.body.data
+    const response = await pool.query(`SELECT 
+    a.id,
+    i.image_name,
+    a.workshop_office_service_advance_description
+    FROM 
+    workshop_office_service_advance a
+    INNER JOIN image i
+    ON a.image_id = i.id
+    WHERE a.workshop_office_work_id = ?`, [`${workshop_office_work_id}`])
+    if (response.length > 0) res.json({ 'Response': 'Operation Success', 'WorkshopOfficeWorkAdvanceList': response })
+    else res.json({ 'Response': 'Work advances not found' })
+})
 
+//Add a workshop office work advance, saving the correspondent image and description
+router.post('/AddWorkshopOfficeWorkAdvance', async (req, res) => {
+    const { workshop_office_work_id, workshop_office_service_advance_description } = req.body
+    //Process to save the image in the server
+    const image = req.files.file
+    const extension = image.name.split(`.`).pop()
+    //Process to save the route in the database
+    const resSaveImage = await pool.query(`INSERT INTO IMAGE (image_name, image_path, image_ext) VALUES (?, ?, ?)`, [`${image.name}`, `public/images/${image.name}`, `${extension}`])
+    await pool.query(`UPDATE image set image_name= "${resSaveImage.insertId}${image.name}", image_path= "${`public/images/${resSaveImage.insertId}${image.name}`}" WHERE id = ${resSaveImage.insertId}`)
+    fs.renameSync(path.resolve(image.path), path.resolve(`public/images/${resSaveImage.insertId}${image.name}`));
+    const response = await pool.query(`INSERT INTO workshop_office_service_advance (image_id, workshop_office_work_id, workshop_office_service_advance_description) VALUES (?, ?, ?)`, [`${resSaveImage.insertId}`, `${workshop_office_work_id}`, `${workshop_office_service_advance_description}`])
+    if (response.affectedRows > 0) res.json({ 'Response': 'Operation Success' })
+    else res.json({ 'Response': 'Operation Failed' })
 })
 
 //Completes the current workshop office work (marks it as complete) and procceds to mark the next milestone in a 'working' state
