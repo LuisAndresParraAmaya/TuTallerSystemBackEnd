@@ -3,7 +3,12 @@ const router = Router()
 const pool = require('../database')
 const transporter = require('../controller/mailer.js')
 const bcryptjs = require('bcryptjs')
+const { WebpayPlus } = require('transbank-sdk')
 const [fs, path] = [require('fs'), require('path')];
+const Environment = require('transbank-sdk').Environment;
+WebpayPlus.commerceCode = 597055555532;
+WebpayPlus.apiKey = '579B532A7440BB0C9079DED94D31EA1615BACEB56610332264630D42D0A36B1C';
+WebpayPlus.environment = Environment.Integration;
 router.post('/CreateAccount', async (req, res) => {
     const {
         user_rut, user_name, user_last_name,
@@ -967,6 +972,32 @@ router.post('/WorkshopOfficeWorkTechnicalReport', async (req, res) => {
     const response = await pool.query(`SELECT * FROM office_work_technical_report WHERE workshop_office_work_id = ?`, [`${workshop_office_work_id}`])
     if (response.length > 0) res.json({ 'Response': 'Operation Success', 'WorkshopOfficeWorkTechnicalReport': response })
     else res.json({ 'Response': 'Technical report not found' })
+})
+
+router.get('/RealizePay', async (req, res) => {
+    //generar url y token con funcion de transbank api.
+    //crear transacción
+    //llegaria del frontend
+    const buyOrder = "001"
+    const sessionId = "A01"
+    const amount = 3533
+    const returnUrl = "http://localhost:8080/ConfirmPay"
+    const response = await WebpayPlus.Transaction.create(buyOrder, sessionId, amount, returnUrl);
+    const { url, token } = response
+    res.json({'url': url, 'token': token})
+    // res.status(307).redirect("https://www.google.com")
+
+    // verificando si fue exitosa
+})
+
+router.post('/ConfirmPay', async (req, res) => {
+    const response = await WebpayPlus.Transaction.commit(req.body.token_ws);
+    if(response.status === "AUTHORIZED"){
+        //sql para registrar en tabla ventas.
+        res.json({Response: "Payment Authorized", Data: response, URL: "http://localhost:3000/PaymentSuccess"})
+    }else{
+        res.json({Response: "Payment Not Authorized", URL: "http://localhost:3000/RealizePay"})
+    }
 })
 
 module.exports = router
