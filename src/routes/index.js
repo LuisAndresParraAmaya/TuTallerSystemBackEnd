@@ -265,17 +265,7 @@ router.post('/AddWorkshopOffice', async (req, res) => {
     const { workshop_id, commune_id, workshop_office_suscription_id, workshop_office_address, workshop_office_phone, workshop_office_attention } = req.body.data
     let values = ''
     try {
-        console.log("antes del insert_into")
-        const statement = `INSERT INTO workshop_office (workshop_id, commune_id, 
-            workshop_suscription_id, workshop_office_address, 
-            workshop_office_phone)
-            VALUES (?, ?, ?, ?, ?)`
-        const response = await pool.query(
-            statement,
-            [`${workshop_id}`, `${commune_id}`,
-            `${workshop_office_suscription_id}`, `${workshop_office_address}`,
-            `${workshop_office_phone}`])
-        console.log("PASANDO EL INSERTINTO")
+        const response = await pool.query(`INSERT INTO workshop_office (workshop_id, commune_id, workshop_suscription_id, workshop_office_address, workshop_office_phone) VALUES (?, ?, ?, ?, ?)`, [`${workshop_id}`, `${commune_id}`, `${workshop_office_suscription_id}`, `${workshop_office_address}`, `${workshop_office_phone}`])
         if (response.affectedRows > 0) {
             for (let i = 0; i < workshop_office_attention.length; i++) {
                 let day = workshop_office_attention[i].workshop_office_attention_day
@@ -884,6 +874,45 @@ router.post('/WorkshopOfficeWorkList', async (req, res) => {
     else res.json({ 'Response': 'Workshop office works not found' })
 })
 
+//Get a workshop office work general information. It requires the work's id
+router.post('/WorkshopOfficeWork', async (req, res) => {
+    const { id } = req.body.data
+    const response = await pool.query(`SELECT 
+	ow.id AS workshop_office_work_id,
+    o.id AS workshop_office_id,
+    ow.workshop_office_work_status,
+    s.workshop_office_service_name,
+    w.workshop_name,
+    uc.user_rut AS customer_rut,
+    uc.user_name AS customer_name,
+    uc.user_last_name AS customer_last_name,
+    o.workshop_office_address,
+    c.commune_name AS workshop_office_commune,
+    r.region_name AS workshop_office_region
+    FROM 
+    workshop_office_work ow
+    LEFT OUTER JOIN workshop_office_service s
+    ON ow.workshop_office_service_id = s.id
+    LEFT OUTER JOIN workshop_office o
+    ON o.id = s.workshop_office_id
+    LEFT OUTER JOIN workshop_office_employee e
+    ON e.workshop_office_id = o.id
+    LEFT OUTER JOIN user uc
+    ON ow.user_user_rut = uc.user_rut
+    LEFT OUTER JOIN user ue
+    ON e.user_rut = ue.user_rut
+    LEFT OUTER JOIN workshop w
+    ON o.workshop_id = w.id
+	LEFT OUTER JOIN commune c
+    ON o.commune_id = c.id
+    LEFT OUTER JOIN region r
+    ON c.region_id = r.id
+    WHERE ow.id = ?
+    GROUP BY ow.id;`, [`${id}`])
+    if (response.length > 0) res.json({ 'Response': 'Operation Success', 'WorkshopOfficeWork': response })
+    else res.json({ 'Response': 'Workshop office work not found' })
+})
+
 //Add a workshop office work in the 'working' status, also add its correspondent milestones. It requires the service id that will be worked on and also the customer rut
 router.post('/AddWorkshopOfficeWork', async (req, res) => {
     const { workshop_office_service_id, user_user_rut } = req.body.data
@@ -967,6 +996,45 @@ router.post('/WorkshopOfficeWorkTechnicalReport', async (req, res) => {
     const response = await pool.query(`SELECT * FROM office_work_technical_report WHERE workshop_office_work_id = ?`, [`${workshop_office_work_id}`])
     if (response.length > 0) res.json({ 'Response': 'Operation Success', 'WorkshopOfficeWorkTechnicalReport': response })
     else res.json({ 'Response': 'Technical report not found' })
+})
+
+//Do the steps to complete the workshop office work, based on the status (first iteration = confirmcompletiontechnician, second iteration = confirmcompletioncustomer, last iteration = complete). If it succeds, it returns the new status
+router.post('/CompleteWorkshopOfficeWork', async (req, res) => {
+    const { id } = req.body.data
+    const response = await pool.query(`SELECT workshop_office_work_status FROM workshop_office_work WHERE id = ?`, [`${id}`])
+    let newStatus = ''
+    if (response.length > 0) {
+        //Proceed only if the work is not already completed definitely, if else then send the correspondent response
+        if (response[0].workshop_office_work_status !== 'complete') {
+            switch (response[0].workshop_office_work_status) {
+                //If the route is called when the work is in 'working' status, that means it's the turn for the technician to confirm the completion first
+                case 'working':
+                    newStatus = 'confirmcompletiontechnician'
+                    break
+                //If the route is called when the work is in 'confirmcompletiontechnician' status, that means that the technician confirmed the completion and now it's the turn for the customer to confirm it
+                case 'confirmcompletiontechnician':
+                    newStatus = 'confirmcompletioncustomer'
+                    break
+                //If the route is called when the work is in 'confirmcompletiontechnician' status, that means that the customer confirmed the completion, therefore the work gets definitely completed
+                case 'confirmcompletioncustomer':
+                    newStatus = 'complete'
+            }
+            const response2 = await pool.query(`UPDATE workshop_office_work SET workshop_office_work_status = ? WHERE id = ?`, [`${newStatus}`, `${id}`])
+            if (response2.affectedRows > 0) res.json({ 'Response': 'Operation Success', 'workshop_office_work_status': newStatus })
+            else res.json({ 'Response': 'Operation Failed' })
+        } else res.json({ 'Response': 'Workshop office work is already completed' })
+    } else res.json({ 'Response': 'Workshop office work not found' })
+})
+
+//Add a workshop office evaluation, with the correspondent rating and review. It requires the rut from the user that created it, the workshop office id and the work id (to update it's status as complete and evaluated) 
+router.post('/AddWorkshopOfficeEvaluation', async (req, res) => {
+    const { workshop_evaluation_rating, workshop_evaluation_review, workshop_office_id, user_user_rut, workshop_office_work_id } = req.body.data
+    const response = await pool.query(`INSERT INTO workshop_office_evaluation (workshop_evaluation_rating, workshop_evaluation_review, user_user_rut, workshop_office_id) VALUES (?, ?, ?, ?)`, [`${workshop_evaluation_rating}`, `${workshop_evaluation_review}`, `${user_user_rut}`, `${workshop_office_id}`, ])
+    if (response.affectedRows > 0) {
+        const response2 = await pool.query(`UPDATE workshop_office_work SET workshop_office_work_status = 'completeandevaluated' WHERE id = ?`, [`${workshop_office_work_id}`])
+        if (response2.affectedRows > 0) res.json({ 'Response': 'Operation Success' })
+        else res.json({ 'Response': 'Could not update the work status' })
+    } else res.json({ 'Response': 'Could not add the evaluation' })
 })
 
 module.exports = router
