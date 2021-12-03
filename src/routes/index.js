@@ -984,15 +984,19 @@ router.post('/CompleteWorkshopOfficeWorkMilestone', async (req, res) => {
         WHERE id = (SELECT id FROM (SELECT id FROM workshop_office_work_milestone WHERE workshop_office_work_id = ? AND workshop_office_work_milestone_status = 'pending' LIMIT 1) AS mid)`, [workshop_office_work_id])
         if (response2.affectedRows > 0) res.json({ 'Response': 'Operation Success' })
         else res.json({ 'Response': 'No workshop milestone is pending' })
-    } else res.json({ 'Response': 'Workshop milestone not found' })
+    } else res.json({ 'Response': 'Workshop milestone already completed' })
 })
 
 //Inserts the vehicle technical report, considering a determined workshop office work
 router.post('/AddWorkshopOfficeWorkTechnicalReport', async (req, res) => {
     const { workshop_office_work_id, office_work_technical_report_km, office_work_technical_report_ppu, office_work_technical_report_fuel_type, office_work_technical_report_color, office_work_technical_report_engine, office_work_technical_report_model, office_work_technical_report_brand, office_work_technical_report_chassis, office_work_technical_report_description } = req.body.data
-    const response = await pool.query(`INSERT INTO office_work_technical_report (workshop_office_work_id, office_work_technical_report_km, office_work_technical_report_ppu, office_work_technical_report_fuel_type, office_work_technical_report_color, office_work_technical_report_engine, office_work_technical_report_model, office_work_technical_report_brand, office_work_technical_report_chassis, office_work_technical_report_description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [`${workshop_office_work_id}`, `${office_work_technical_report_km}`, `${office_work_technical_report_ppu}`, `${office_work_technical_report_fuel_type}`, `${office_work_technical_report_color}`, `${office_work_technical_report_engine}`, `${office_work_technical_report_model}`, `${office_work_technical_report_brand}`, `${office_work_technical_report_chassis}`, `${office_work_technical_report_description}` ])
-    if (response.affectedRows > 0) res.json({ 'Response': 'Operation Success' })
-    else res.json({ 'Response': 'Operation Failed' })
+    const response = await pool.query(`SELECT id FROM office_work_technical_report WHERE workshop_office_work_id = ?`, [`${workshop_office_work_id}`])
+    //Make sure that the work doesn't have a technical report already before adding
+    if (response.length == 0) {
+        const response2 = await pool.query(`INSERT INTO office_work_technical_report (workshop_office_work_id, office_work_technical_report_km, office_work_technical_report_ppu, office_work_technical_report_fuel_type, office_work_technical_report_color, office_work_technical_report_engine, office_work_technical_report_model, office_work_technical_report_brand, office_work_technical_report_chassis, office_work_technical_report_description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [`${workshop_office_work_id}`, `${office_work_technical_report_km}`, `${office_work_technical_report_ppu}`, `${office_work_technical_report_fuel_type}`, `${office_work_technical_report_color}`, `${office_work_technical_report_engine}`, `${office_work_technical_report_model}`, `${office_work_technical_report_brand}`, `${office_work_technical_report_chassis}`, `${office_work_technical_report_description}` ])
+        if (response2.affectedRows > 0) res.json({ 'Response': 'Operation Success' })
+        else res.json({ 'Response': 'Operation Failed' })
+    } else res.json({ 'Response': 'Workshop office work already has a technical report' })
 })
 
 //Get the workshop office technical report. It requires the workshop office work id
@@ -1005,29 +1009,31 @@ router.post('/WorkshopOfficeWorkTechnicalReport', async (req, res) => {
 
 //Do the steps to complete the workshop office work, based on the status (first iteration = confirmcompletiontechnician, second iteration = confirmcompletioncustomer, last iteration = complete). If it succeds, it returns the new status
 router.post('/CompleteWorkshopOfficeWork', async (req, res) => {
-    const { id } = req.body.data
+    const { id, workshop_office_work_actual_status } = req.body.data
     const response = await pool.query(`SELECT workshop_office_work_status FROM workshop_office_work WHERE id = ?`, [`${id}`])
     let newStatus = ''
     if (response.length > 0) {
-        //Proceed only if the work is not already completed definitely, if else then send the correspondent response
-        if (response[0].workshop_office_work_status !== 'complete') {
-            switch (response[0].workshop_office_work_status) {
-                //If the route is called when the work is in 'working' status, that means it's the turn for the technician to confirm the completion first
-                case 'working':
-                    newStatus = 'confirmcompletiontechnician'
-                    break
-                //If the route is called when the work is in 'confirmcompletiontechnician' status, that means that the technician confirmed the completion and now it's the turn for the customer to confirm it
-                case 'confirmcompletiontechnician':
-                    newStatus = 'confirmcompletioncustomer'
-                    break
-                //If the route is called when the work is in 'confirmcompletiontechnician' status, that means that the customer confirmed the completion, therefore the work gets definitely completed
-                case 'confirmcompletioncustomer':
-                    newStatus = 'complete'
-            }
-            const response2 = await pool.query(`UPDATE workshop_office_work SET workshop_office_work_status = ? WHERE id = ?`, [`${newStatus}`, `${id}`])
-            if (response2.affectedRows > 0) res.json({ 'Response': 'Operation Success', 'workshop_office_work_status': newStatus })
-            else res.json({ 'Response': 'Operation Failed' })
-        } else res.json({ 'Response': 'Workshop office work is already completed' })
+        if (workshop_office_work_actual_status == response[0].workshop_office_work_status) {
+            //Proceed only if the work is not already completed definitely, if else then send the correspondent response
+            if (response[0].workshop_office_work_status !== 'complete') {
+                switch (response[0].workshop_office_work_status) {
+                    //If the route is called when the work is in 'working' status, that means it's the turn for the technician to confirm the completion first
+                    case 'working':
+                        newStatus = 'confirmcompletiontechnician'
+                        break
+                    //If the route is called when the work is in 'confirmcompletiontechnician' status, that means that the technician confirmed the completion and now it's the turn for the customer to confirm it
+                    case 'confirmcompletiontechnician':
+                        newStatus = 'confirmcompletioncustomer'
+                        break
+                    //If the route is called when the work is in 'confirmcompletiontechnician' status, that means that the customer confirmed the completion, therefore the work gets definitely completed
+                    case 'confirmcompletioncustomer':
+                        newStatus = 'complete'
+                }
+                const response2 = await pool.query(`UPDATE workshop_office_work SET workshop_office_work_status = ? WHERE id = ?`, [`${newStatus}`, `${id}`])
+                if (response2.affectedRows > 0) res.json({ 'Response': 'Operation Success', 'workshop_office_work_status': newStatus })
+                else res.json({ 'Response': 'Operation Failed' })
+            } else res.json({ 'Response': 'Workshop office work is already completed' })
+        } else res.json({ 'Response': 'That workshop office work status already changed' })
     } else res.json({ 'Response': 'Workshop office work not found' })
 })
 
