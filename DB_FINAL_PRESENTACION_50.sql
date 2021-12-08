@@ -382,7 +382,7 @@ CREATE TABLE IF NOT EXISTS `tutaller`.`payment_receipt_suscription` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `workshop_suscription_id` INT(11) NOT NULL,
   `payment_receipt_id` INT(11) NOT NULL,
-  PRIMARY KEY (`id`, `workshop_suscription_id`, `payment_receipt_id`),
+  PRIMARY KEY (`id`),
   CONSTRAINT `fk_payment_receipt_suscription_payment_receipt1`
     FOREIGN KEY (`payment_receipt_id`)
     REFERENCES `tutaller`.`payment_receipt` (`id`)
@@ -479,6 +479,7 @@ CREATE TABLE IF NOT EXISTS `tutaller`.`usability_questionnaire` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `usability_questionnaire_name` VARCHAR(45) NOT NULL,
   `usability_questionnaire_description` VARCHAR(580) NOT NULL,
+  `usability_questionnaire_status` VARCHAR(45) NOT NULL,
   PRIMARY KEY (`id`))
 ENGINE = InnoDB
 DEFAULT CHARACTER SET = utf8;
@@ -529,7 +530,7 @@ DEFAULT CHARACTER SET = utf8;
 -- Table `tutaller`.`questionnaire_question_item`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `tutaller`.`questionnaire_question_item` (
-  `id` INT(11) NOT NULL,
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
   `questionnaire_question_id` INT(11) NOT NULL,
   `questionnarie_question_item_statement` VARCHAR(580) NOT NULL,
   PRIMARY KEY (`id`),
@@ -589,7 +590,7 @@ DEFAULT CHARACTER SET = utf8;
 -- Table `tutaller`.`user_usability_questionnaire`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `tutaller`.`user_usability_questionnaire` (
-  `id` INT(11) NOT NULL,
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
   `user_user_rut` INT(11) NOT NULL,
   `usability_questionnaire_id` INT(11) NOT NULL,
   `status` VARCHAR(45) NOT NULL,
@@ -681,9 +682,10 @@ DEFAULT CHARACTER SET = utf8;
 -- Table `tutaller`.`workshop_office_work_case`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `tutaller`.`workshop_office_work_case` (
-  `idworkshop_office_work_case` INT(11) NOT NULL,
+  `idworkshop_office_work_case` INT(11) NOT NULL AUTO_INCREMENT,
   `workshop_office_work_case_msg` VARCHAR(255) NOT NULL,
   `case_current_status` VARCHAR(45) NOT NULL,
+  `workshop_office_work_case_date_time` DATETIME NOT NULL,
   `workshop_office_work_id` INT(11) NOT NULL,
   `user_user_rut` INT(11) NOT NULL,
   PRIMARY KEY (`idworkshop_office_work_case`),
