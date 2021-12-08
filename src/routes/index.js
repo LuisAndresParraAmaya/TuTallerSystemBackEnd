@@ -45,7 +45,6 @@ router.post('/CreateAccount', async (req, res) => {
 router.post('/Login', async (req, respuesta) => {
     const { user_email, user_password } = req.body.data
     // Traer contraseña encriptada del usuario
-    console.log(user_email, user_password)
     const response = await pool.query('SELECT * FROM `user` WHERE `user_email` = ?', [`${user_email}`]);
     if (response.length > 0) {
         bcryptjs.compare(user_password, response[0].user_password, function (err, res) {
@@ -1072,6 +1071,164 @@ router.post('/ConfirmPay', async (req, res) => {
     }else{
         res.json({Response: "Payment Not Authorized", URL: "http://localhost:3000/RealizePay"})
     }
+})
+
+//Adds a workshop office work dispute case, where it firsts update the work status to 'caseopened', then after the case was inserted in the DB it sends a e-mail to the TuTaller system admins, the work customer and the workshop admin
+router.post('/FileWorkshopOfficeWorkDisputeCase', async (req, res) => {
+    const { workshop_office_work_case_msg, workshop_office_work_id, user_user_rut } = req.body.data
+    const response = await pool.query(`UPDATE workshop_office_work SET workshop_office_work_status = 'caseopened' WHERE id = ? AND workshop_office_work_status = 'confirmcompletioncustomer'`, [`${workshop_office_work_id}`])
+    if (response.affectedRows > 0) {
+        await pool.query(`INSERT INTO workshop_office_work_case (workshop_office_work_case_msg, case_current_status, workshop_office_work_id, user_user_rut, workshop_office_work_case_date_time) VALUES (?, 'pending', ?, ?, now())`, [`${workshop_office_work_case_msg}`, `${workshop_office_work_id}`, `${user_user_rut}`])
+        //Work customer e-mail (single)
+        const response2 = await pool.query(`SELECT user_name, user_last_name, user_email FROM user WHERE user_rut = ?`, [`${user_user_rut}`])
+        const workCustomer = response2[0]
+        //TuTaller system admins e-mails (multiple)
+        const response3 = await pool.query(`SELECT user_email FROM user WHERE user_type_id = 1`)
+        const systemAdminsEmails = response3.map(element => Object.values(element))
+        //Workshop information
+        const response4 = await pool.query(`SELECT
+        ws.workshop_name,
+        s.workshop_office_service_name,
+        o.workshop_office_address,
+        c.commune_name AS workshop_office_commune,
+        r.region_name AS workshop_office_region,
+        u.user_name,
+        u.user_last_name,
+        u.user_email
+        FROM workshop_office_work w
+        INNER JOIN workshop_office_service s
+        ON w.workshop_office_service_id = s.id
+        INNER JOIN workshop_office o
+        ON s.workshop_office_id = o.id
+        INNER JOIN postulation p
+        ON o.workshop_id = p.workshop_id
+        INNER JOIN user u
+        ON p.user_user_rut = u.user_rut
+        INNER JOIN workshop ws
+        ON o.workshop_id = ws.id
+        INNER JOIN commune c
+        ON o.commune_id = c.id
+        INNER JOIN region r
+        ON c.region_id = r.id
+        WHERE w.id = ?`, [`${workshop_office_work_id}`])
+        const workshopInfo = response4[0]
+        // Send the case e-mail to the workshop admin and the TuTaller system admins
+        await transporter.sendMail({
+            from: '"TuTaller" <luisandresparraamaya@gmail.com>',
+            to: systemAdminsEmails+', '+workshopInfo.user_email,
+            cc: workCustomer.user_email,
+            subject: `Apertura de caso para un servicio prestado del taller ${workshopInfo.workshop_name}`,
+            html: `<p>Estimado administrador del taller ${workshopInfo.workshop_name}, ${workshopInfo.user_name} ${workshopInfo.user_last_name}, y administradores de TuTaller, este 
+            caso de disputa va dirigido hacia la sucursal automotriz proveniente de ${workshopInfo.workshop_office_address}, de la comuna de ${workshopInfo.workshop_office_commune}, ${workshopInfo.workshop_office_region}, esto con respecto al servicio de ${workshopInfo.workshop_office_service_name} el cual ha sido prestado al cliente ${workCustomer.user_name} ${workCustomer.user_last_name}.</p><br/>
+
+            <p>El reclamo escrito por el cliente es el siguiente:</p>
+            
+            <p>${workshop_office_work_case_msg}</p><br/>
+
+            <p>Favor de responder a este mensaje de correo electrónico en caso de una objeción, ya que los administradores de TuTaller revisarán el caso y responderán a favor del cliente o de la sucursal automotriz dentro de 30 días, enviando el dinero correspondiente a la parte a la que se esté a favor.</p><br/>
+
+            <b style="color: #166C9B">TuTaller</b><br/>
+            Santiago, Puente Alto<br/>
+            Pasaje Hotu Matua #1623<br/>
+            Teléfonos: +56 9 8440 2225, +56 9 9472 8410 y +56 9 9653 3164<br/>
+            www.tutaller.cl<br/><br/>
+            <hr/>
+            <p>CONFIDENCIALIDAD: La información contenida en este mensaje y/o en los archivos adjuntos es de carácter confidencial o privilegiada y está destinada al uso exclusivo del emisor y/o de la persona o entidad a quien va dirigida. Si usted no es el destinatario, cualquier almacenamiento, divulgación, distribución o copia de esta información está estrictamente prohibida y será sancionado por la ley. Si recibió este mensaje por error, por favor infórmenos inmediatamente respondiendo este mismo mensaje y borre éste y todos los archivos adjuntos. Gracias.</p><br/>
+            <p>CONFIDENTIALITY NOTE: The information contained in this email, or any attachments to it, may be confidential and/or privileged and are for the intended addressee(s) only. Any unauthorized use, retention, disclosure, distribution or copying of this e-mail, or any information it contains, is prohibited and may be sanctioned by law. If you are not the intended recipient and received this message by mistake, please reply to sender and inform us, and then delete this mail and all attachments from your computer. Thank you.</p>`
+        })
+        res.json({ 'Response': 'Operation Success' })
+    } else res.json({ 'Response': 'Work must be in the phase where the customer has to confirm its completion' })
+})
+
+//Get the workshop office work dispute case list, including the pending ones and the ones that have been resolved already. It also gets relevant information, such as the workshop name, customer name, workshop admin name, etc.
+router.get('/WorkshopOfficeWorkDisputeCaseList', async (req, res) => {
+    const response = await pool.query(`SELECT
+    wc.idworkshop_office_work_case,
+    wc.workshop_office_work_case_msg,
+    wc.case_current_status,
+    wc.workshop_office_work_id,
+    wc.workshop_office_work_case_date_time,
+    wc.user_user_rut AS customer_rut,
+    u.user_name AS customer_name,
+    u.user_last_name AS customer_last_name,
+    u.user_email AS customer_email,
+    ua.user_name AS workshop_admin_name,
+    ua.user_last_name AS workshop_admin_last_name,
+    ua.user_email AS workshop_admin_email,
+    ws.workshop_name,
+    s.workshop_office_service_name,
+    o.workshop_office_address,
+    c.commune_name AS workshop_office_commune,
+    r.region_name AS workshop_office_region
+    FROM workshop_office_work_case wc
+    INNER JOIN workshop_office_work w
+    ON wc.workshop_office_work_id = w.id
+    INNER JOIN workshop_office_service s
+    ON w.workshop_office_service_id = s.id
+    INNER JOIN workshop_office o
+    ON s.workshop_office_id = o.id
+    INNER JOIN commune c
+    ON o.commune_id = c.id
+    INNER JOIN region r
+    ON c.region_id = r.id
+    INNER JOIN workshop ws
+    ON o.workshop_id = ws.id
+    INNER JOIN user u
+    ON wc.user_user_rut = u.user_rut
+    INNER JOIN postulation p
+    ON ws.id = p.workshop_id
+    INNER JOIN user ua
+    ON p.user_user_rut = ua.user_rut`)
+    if (response.length > 0) res.json({ 'Response': 'Operation Success', 'WorkshopOfficeWorkDisputeCaseList': response })
+    else res.json({ 'Response': 'Work disputes not found' })
+})
+
+//Resolve a workshop office work dispute case, in favor of the customer or workshop (it gets this decision from the client side). It updates the case to resolved, then it updates the work to cancelled (when in favor of the customer) or complete (when in favor of the workshop). Lastly, it sends the resolution to both the customer and workshop admin, also sending a occult copy to all the TuTaller system admins
+router.post('/ResolveWorkshopOfficeWorkDisputeCase', async (req, res) => {
+    const { case_resolve_msg, idworkshop_office_work_case, case_new_status, workshop_office_work_id, workshop_office_service_name, customer_name, customer_last_name, customer_email, workshop_admin_name, workshop_admin_last_name, workshop_admin_email, workshop_name, workshop_office_address, workshop_office_commune, workshop_office_region } = req.body.data
+    const response = await pool.query(`UPDATE workshop_office_work_case SET case_current_status = ? WHERE idworkshop_office_work_case = ? AND case_current_status = 'pending'`, [`${case_new_status}`, `${idworkshop_office_work_case}`])
+    if (response.affectedRows > 0) {
+        let workNewStatus = ''
+        let inFavor = ''
+        switch (case_new_status) {
+            case 'resolvedinfavorofcustomer':
+                workNewStatus = 'cancelled'
+                inFavor = 'del cliente'
+                break
+            case 'resolvedinfavorofoffice':
+                workNewStatus = 'complete'
+                inFavor = 'de la sucursal automotriz'
+        }
+        await pool.query(`UPDATE workshop_office_work SET workshop_office_work_status = ? WHERE id = ?`, [`${workNewStatus}`, `${workshop_office_work_id}`])
+        //TuTaller system admins e-mails (multiple)
+        const response3 = await pool.query(`SELECT user_email FROM user WHERE user_type_id = 1`)
+        const systemAdminsEmails = response3.map(element => Object.values(element))
+        //Send the e-mail
+        await transporter.sendMail({
+            from: '"TuTaller" <luisandresparraamaya@gmail.com>',
+            to: customer_email+', '+workshop_admin_email,
+            bcc: systemAdminsEmails,
+            subject: `Resolución de caso para un servicio prestado del taller ${workshop_name}`,
+            html: `<p>Estimado administrador del taller ${workshop_name}, ${workshop_admin_name} ${workshop_admin_last_name}, y el cliente del servicio, ${customer_name} ${customer_last_name}, esta resolución de 
+            caso de disputa va dirigido hacia la sucursal automotriz proveniente de ${workshop_office_address}, de la comuna de ${workshop_office_commune}, ${workshop_office_region}, esto con respecto al servicio de ${workshop_office_service_name} prestado.</p><br/>
+
+            <p>Los administradores de TuTaller han revisado el caso y han decidido responder a favor de ${inFavor}, por lo que esta parte ha recibido el dinero correspondiente.</p>
+
+            <p>La razón por la cual se decidió responder a favor de la parte mencionada fue la siguiente:</p>
+            
+            <p>${case_resolve_msg}</p><br/>
+
+            <b style="color: #166C9B">TuTaller</b><br/>
+            Santiago, Puente Alto<br/>
+            Pasaje Hotu Matua #1623<br/>
+            Teléfonos: +56 9 8440 2225, +56 9 9472 8410 y +56 9 9653 3164<br/>
+            www.tutaller.cl<br/><br/>
+            <hr/>
+            <p>CONFIDENCIALIDAD: La información contenida en este mensaje y/o en los archivos adjuntos es de carácter confidencial o privilegiada y está destinada al uso exclusivo del emisor y/o de la persona o entidad a quien va dirigida. Si usted no es el destinatario, cualquier almacenamiento, divulgación, distribución o copia de esta información está estrictamente prohibida y será sancionado por la ley. Si recibió este mensaje por error, por favor infórmenos inmediatamente respondiendo este mismo mensaje y borre éste y todos los archivos adjuntos. Gracias.</p><br/>
+            <p>CONFIDENTIALITY NOTE: The information contained in this email, or any attachments to it, may be confidential and/or privileged and are for the intended addressee(s) only. Any unauthorized use, retention, disclosure, distribution or copying of this e-mail, or any information it contains, is prohibited and may be sanctioned by law. If you are not the intended recipient and received this message by mistake, please reply to sender and inform us, and then delete this mail and all attachments from your computer. Thank you.</p>`
+        })
+        res.json({ 'Response': 'Operation Success' })
+    } else res.json({ 'Response': 'Dispute already resolved' })
 })
 
 module.exports = router
