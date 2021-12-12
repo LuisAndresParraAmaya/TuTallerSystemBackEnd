@@ -663,6 +663,7 @@ CREATE TABLE IF NOT EXISTS `tutaller`.`workshop_office_service_payment_receipt` 
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `workshop_office_service_id` INT(11) NOT NULL,
   `payment_receipt_id` INT(11) NOT NULL,
+  `payment_status` VARCHAR(25) NOT NULL,
   PRIMARY KEY (`id`),
   CONSTRAINT `fk_workshop_office_service_payment_receipt_payment_receipt1`
     FOREIGN KEY (`payment_receipt_id`)
