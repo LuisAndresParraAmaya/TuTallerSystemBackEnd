@@ -121,7 +121,7 @@ router.post('/RecoveryPassword', async (req, res) => {
         VALUES (?, ?)`, [`${user_email}`, `${recovery_code}`])
         if (response.affectedRows > 0) {
             await transporter.sendMail({
-                from: '"Solicitaste restablecer tu contraseña" <luisandresparraamaya@gmail.com>', // sender address
+                from: '"Solicitaste restablecer tu contraseña" <tutaller.official@gmail.com>', // sender address
                 to: user_email, // list of receivers
                 subject: "Recuperación de contraseña", // Subject line
                 html: `<b>Ingresa el siguiente codigo:${recovery_code}</b>`, // html body
@@ -242,7 +242,7 @@ router.post('/AcceptWorkshopPostulation', async (req, res) => {
     const query2 = `SELECT user_email FROM user WHERE user_rut = ?`
     const response = await pool.query(query2, [`${user_rut}`])
     await transporter.sendMail({
-        from: '"Tu taller fue aceptado" <luisandresparraamaya@gmail.com>',
+        from: '"Tu taller fue aceptado" <tutaller.official@gmail.com>',
         to: response[0].user_email,
         subject: "Aceptación de postulación en TuTaller",
         html: `<b>La postulación de su taller fue aprobada, ya puede comenzar a registrar las sucursales de su taller.</b>`,
@@ -257,7 +257,7 @@ router.post('/RejectWorkshopPostulation', async (req, res) => {
     await pool.query(query, [`rejected`, `${id}`])
     const response = await pool.query(query2, [`${user_rut}`])
     await transporter.sendMail({
-        from: '"Tu taller fue rechazado" <luisandresparraamaya@gmail.com>',
+        from: '"Tu taller fue rechazado" <tutaller.official@gmail.com>',
         to: response[0].user_email,
         subject: "Rechazo de postulación en TuTaller",
         html: `<b>La postulación de su taller fue rechazada por la siguiente razón: ${reject_reason}</b>`,
@@ -306,7 +306,7 @@ router.post('/SendValidateCodeEmail', async (req, res) => {
     await pool.query(`INSERT INTO email_validate_codes (user_email, recovery_code)
         VALUES (?, ?)`, [`${user_email}`, `${recovery_code}`])
     await transporter.sendMail({
-        from: '"Solicitaste actualizar tu correo electrónico" <luisandresparraamaya@gmail.com>', // sender address
+        from: '"Solicitaste actualizar tu correo electrónico" <tutaller.official@gmail.com>', // sender address
         to: user_new_email, // list of receivers
         subject: "Modificación de correo electrónico en TuTaller", // Subject line
         html: `<b>Para modificar tu correo electrónico debes ingresar el siguiente codigo:${recovery_code}, si no solicitaste cambiar tu correo electrónico ignora este mensaje.</b>`,
@@ -540,7 +540,7 @@ router.post('/FileWorkShopOfficeComplaint', async (req, res) => {
     const systemAdminsEmails = response2.map(element => Object.values(element))
     // Enviar correo al administrador del taller y administradores del sistema
     await transporter.sendMail({
-        from: '"TuTaller" <luisandresparraamaya@gmail.com>',
+        from: '"TuTaller" <tutaller.official@gmail.com>',
         to: workshopadmin.user_email,
         cc: systemAdminsEmails,
         subject: `Reclamo hacia una sucursal del taller ${workshop_name}`,
@@ -576,7 +576,7 @@ router.post('/FileSupportTicket', async (req, res) => {
     const systemAdminsEmails = response.map(element => Object.values(element))
     // Enviar correo de soporte a los administradores del sistema
     await transporter.sendMail({
-        from: '"TuTaller" <luisandresparraamaya@gmail.com>',
+        from: '"TuTaller" <tutaller.official@gmail.com>',
         to: systemAdminsEmails,
         subject: support_subject,
         html: `<p>Estimados administradores de TuTaller, han recibido el siguiente mensaje por parte del usuario ${user_name} con fines de soporte:</p>
@@ -596,7 +596,7 @@ router.post('/FileSupportTicket', async (req, res) => {
     })
     // Enviar correo al usuario que mandó el mensaje, con fines de acuso de recibo
     await transporter.sendMail({
-        from: '"TuTaller" <luisandresparraamaya@gmail.com>',
+        from: '"TuTaller" <tutaller.official@gmail.com>',
         to: user_email,
         subject: 'Solicitud de Soporte TuTaller',
         html: `<p>Estimado(a) ${user_name},</p>
@@ -815,7 +815,7 @@ router.post('/ModerateWorkshopOfficeEvaluation', async (req, res) => {
     if (response.affectedRows > 0) {
         const response2 = await pool.query(`SELECT user_email FROM user WHERE user_rut = ?`, [`${user_user_rut}`])
         await transporter.sendMail({
-            from: '"TuTaller" <luisandresparraamaya@gmail.com>',
+            from: '"TuTaller" <tutaller.official@gmail.com>',
             to: response2[0].user_email,
             subject: 'Tu evaluación ha sido moderada',
             html: `<p>Estimado usuario de TuTaller, una de tus evaluaciones que has realizado al taller ${workshop_name} para la sucursal proveniente de ${workshop_office_address}, de la comuna de ${workshop_office_commune}, ${workshop_office_region} ha sido eliminada por el siguiente motivo:</p>
@@ -1114,7 +1114,7 @@ router.post('/FileWorkshopOfficeWorkDisputeCase', async (req, res) => {
         const workshopInfo = response4[0]
         // Send the case e-mail to the workshop admin and the TuTaller system admins
         await transporter.sendMail({
-            from: '"TuTaller" <luisandresparraamaya@gmail.com>',
+            from: '"TuTaller" <tutaller.official@gmail.com>',
             to: systemAdminsEmails+', '+workshopInfo.user_email,
             cc: workCustomer.user_email,
             subject: `Apertura de caso para un servicio prestado del taller ${workshopInfo.workshop_name}`,
@@ -1205,7 +1205,7 @@ router.post('/ResolveWorkshopOfficeWorkDisputeCase', async (req, res) => {
         const systemAdminsEmails = response3.map(element => Object.values(element))
         //Send the e-mail
         await transporter.sendMail({
-            from: '"TuTaller" <luisandresparraamaya@gmail.com>',
+            from: '"TuTaller" <tutaller.official@gmail.com>',
             to: customer_email+', '+workshop_admin_email,
             bcc: systemAdminsEmails,
             subject: `Resolución de caso para un servicio prestado del taller ${workshop_name}`,
