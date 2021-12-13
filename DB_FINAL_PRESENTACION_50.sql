@@ -153,6 +153,7 @@ CREATE TABLE IF NOT EXISTS `tutaller`.`workshop` (
   `workshop_name` VARCHAR(45) NOT NULL,
   `workshop_number` INT(11) NOT NULL,
   `workshop_description` VARCHAR(580) NOT NULL,
+  `workshop_business_name` VARCHAR(100) NOT NULL,
   PRIMARY KEY (`id`))
 ENGINE = InnoDB
 AUTO_INCREMENT = 38
@@ -456,6 +457,7 @@ CREATE TABLE IF NOT EXISTS `tutaller`.`postulation` (
   `postulation_message` VARCHAR(99) NOT NULL,
   `workshop_id` SMALLINT(6) NOT NULL,
   `postulation_date_time` DATETIME NOT NULL,
+  `postulation_user_identity_document_image_id` INT NOT NULL,
   PRIMARY KEY (`id`),
   CONSTRAINT `fk_postulation_workshop1`
     FOREIGN KEY (`workshop_id`)
@@ -465,6 +467,11 @@ CREATE TABLE IF NOT EXISTS `tutaller`.`postulation` (
   CONSTRAINT `fk_postulations_user1`
     FOREIGN KEY (`user_user_rut`)
     REFERENCES `tutaller`.`user` (`user_rut`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_postulation_image1`
+    FOREIGN KEY (`postulation_user_identity_document_image_id`)
+    REFERENCES `tutaller`.`image` (`id`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION)
 ENGINE = InnoDB
