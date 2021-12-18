@@ -186,7 +186,7 @@ router.post('/DisableAccount', async (req, respuesta) => {
         if (res) {
             await pool.query(`UPDATE user SET user_status = ? WHERE user_rut = ?`, [`disabled`, `${user_rut}`])
             await pool.query(`DROP EVENT IF EXISTS UserDisable${user_rut};`)
-            await pool.query(`CREATE EVENT UserDisable${user_rut} ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 month DO UPDATE user set user_status = 'deleted' WHERE user_rut = ${user_rut};`)
+            await pool.query(`CREATE EVENT UserDisable${user_rut} ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 month DO UPDATE user SET user_status = 'deleted' WHERE user_rut = ?`, [`${user_rut}`])
             respuesta.json({ 'Response': 'Operation Success' })
         } else {
             respuesta.json({ 'Response': 'Actual Password Failed' })
@@ -384,18 +384,18 @@ router.post('/MyWorkshopOfficeAttention', async (req, res) => {
 router.post('/AddWorkshopOfficeEmployee', async (req, res) => {
     const { workshop_office_id, user_rut, workshop_office_employee_specialization, workshop_office_employee_experience } = req.body.data
     try {
-            const statement2 = `UPDATE user set user_type_id = 4 WHERE user_rut = ? && (user_type_id = 2 OR user_type_id = 4)`
-            const resp2 = await pool.query(statement2, [`${user_rut}`])
-    
-            if (resp2.affectedRows > 0) {
-                const statement = `INSERT INTO workshop_office_employee (workshop_office_id, user_rut, workshop_office_employee_specialization, workshop_office_employee_experience) VALUES (?, ?, ?, ?)`
-                const response = await pool.query(statement, [`${workshop_office_id}`, `${user_rut}`, `${workshop_office_employee_specialization}`, `${workshop_office_employee_experience}`])
-                res.json({ 'Response': 'Operation Success' })
-            } else {
-                res.json({ 'Response': 'Type user is not allowed' })
-            }
+        const statement2 = `UPDATE user set user_type_id = 4 WHERE user_rut = ? && (user_type_id = 2 OR user_type_id = 4)`
+        const resp2 = await pool.query(statement2, [`${user_rut}`])
 
-        } catch (exception) {
+        if (resp2.affectedRows > 0) {
+            const statement = `INSERT INTO workshop_office_employee (workshop_office_id, user_rut, workshop_office_employee_specialization, workshop_office_employee_experience) VALUES (?, ?, ?, ?)`
+            const response = await pool.query(statement, [`${workshop_office_id}`, `${user_rut}`, `${workshop_office_employee_specialization}`, `${workshop_office_employee_experience}`])
+            res.json({ 'Response': 'Operation Success' })
+        } else {
+            res.json({ 'Response': 'Type user is not allowed' })
+        }
+
+    } catch (exception) {
         const errorSQL = exception.sqlMessage
         if (errorSQL.includes('foreign key')) {
             res.json({ 'Response': 'Rut not exist' })
@@ -691,7 +691,7 @@ router.post('/AdvertiseWorkShopOfficeAd', async (req, res) => {
 
     // Programar tarea de actualizacion tras 1 minuto.
     await pool.query(`DROP EVENT IF EXISTS workshopOfficeAd${req.body.data.id};`)
-    await pool.query(`CREATE EVENT workshopOfficeAd${req.body.data.id} ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 day DO UPDATE workshop_office_ad set workshop_office_ad_status = 'inactive', workshop_office_ad_bid = 0 WHERE id = ${req.body.data.id};`)
+    await pool.query(`CREATE EVENT workshopOfficeAd${req.body.data.id} ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 day DO UPDATE workshop_office_ad SET workshop_office_ad_status = 'inactive', workshop_office_ad_bid = 0 WHERE id = ?`, [`${req.body.data.id}`])
     res.json({ 'Response': 'Operation Success' })
 })
 
@@ -706,10 +706,10 @@ router.get('/img', async (req, res) => {
     WHERE o.workshop_office_ad_status = 'active'
     ORDER BY RAND() * workshop_office_ad_bid DESC
     LIMIT 1;`)
-    if(response[0] !== undefined){
+    if (response[0] !== undefined) {
         res.sendFile(`${response[0].image_name}`, { root: 'public/images' });
     }
-  
+
 })
 
 router.get('/comprobeIMG', async (req, res) => {
@@ -764,7 +764,7 @@ router.post('/ActivateOffer', async (req, res) => {
     const response = await pool.query(`SELECT id FROM ${itemTable} WHERE id IN (${offer_item_id_list}) AND offer_id = 1`)
     //Validates that the selected items doesn't have offers
     if (response.length == offer_item_id_list.length) {
-        const response2 = await pool.query (`INSERT INTO offer (offer_name, offer_discount, offer_valid_until_date, offer_valid_until_time) VALUES (?, ?, ?, ?)`, [`${offer.offer_name}`, `${offer.offer_discount}`, `${offer.offer_valid_until_date}`, `${offer.offer_valid_until_time}`])
+        const response2 = await pool.query(`INSERT INTO offer (offer_name, offer_discount, offer_valid_until_date, offer_valid_until_time) VALUES (?, ?, ?, ?)`, [`${offer.offer_name}`, `${offer.offer_discount}`, `${offer.offer_valid_until_date}`, `${offer.offer_valid_until_time}`])
         if (response2.affectedRows > 0) {
             await pool.query(`UPDATE ${itemTable} SET offer_id = ? WHERE id IN (${offer_item_id_list})`, [`${response2.insertId}`])
             let eventId = itemTable + offer_item_id_list.toString().replace(/,/g, '')//Creates an ID for the event based on the item's table and the ID's for the items
@@ -805,7 +805,7 @@ router.post('/DeleteWorkshopOfficeEvaluation', async (req, res) => {
     const { id, user_user_rut } = req.body.data
     const response = await pool.query(`DELETE FROM workshop_office_evaluation WHERE id = ? AND user_user_rut = ?`, [`${id}`, `${user_user_rut}`])
     if (response.affectedRows > 0) res.json({ 'Response': 'Operation Success' })
-    else res.json({'Response': 'Evaluation not found'})
+    else res.json({ 'Response': 'Evaluation not found' })
 })
 
 //Moderates a workshop office evaluation by deleting it and sending an e-mail with a moderate reason to the user that made that evaluation
@@ -836,7 +836,7 @@ router.post('/ModerateWorkshopOfficeEvaluation', async (req, res) => {
         })
         res.json({ 'Response': 'Operation Success' })
     }
-    else res.json({'Response': 'Evaluation not found'})
+    else res.json({ 'Response': 'Evaluation not found' })
 })
 
 //Get the workshop office work list associated to a user (it needs that user's Rut)
@@ -927,8 +927,8 @@ router.post('/AddWorkshopOfficeWork', async (req, res) => {
         (?, 'Recepción del vehículo', 'El cliente debe llevar su vehículo a la sucursal automotriz.', 'working'), 
         (?, 'Inspección del vehículo', 'El técnico realizará una ficha técnica al vehículo del cliente.', 'pending'), 
         (?, 'Realización del servicio', 'El técnico está trabajando en el servicio automotriz acordado.', 'pending'), 
-        (?, 'Retiro del vehículo', 'El cliente debe ir a retirar su vehículo a la sucursal automotriz.', 'pending')`, 
-        [`${response.insertId}`, `${response.insertId}`, `${response.insertId}`, `${response.insertId}`])
+        (?, 'Retiro del vehículo', 'El cliente debe ir a retirar su vehículo a la sucursal automotriz.', 'pending')`,
+            [`${response.insertId}`, `${response.insertId}`, `${response.insertId}`, `${response.insertId}`])
         if (response2.affectedRows > 0) res.json({ 'Response': 'Operation Success' })
         else res.json({ 'Response': 'Milestone adding failed' })
     } else res.json({ 'Response': 'Invalid user rut or service' })
@@ -992,7 +992,7 @@ router.post('/AddWorkshopOfficeWorkTechnicalReport', async (req, res) => {
     const response = await pool.query(`SELECT id FROM office_work_technical_report WHERE workshop_office_work_id = ?`, [`${workshop_office_work_id}`])
     //Make sure that the work doesn't have a technical report already before adding
     if (response.length == 0) {
-        const response2 = await pool.query(`INSERT INTO office_work_technical_report (workshop_office_work_id, office_work_technical_report_km, office_work_technical_report_ppu, office_work_technical_report_fuel_type, office_work_technical_report_color, office_work_technical_report_engine, office_work_technical_report_model, office_work_technical_report_brand, office_work_technical_report_chassis, office_work_technical_report_description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [`${workshop_office_work_id}`, `${office_work_technical_report_km}`, `${office_work_technical_report_ppu}`, `${office_work_technical_report_fuel_type}`, `${office_work_technical_report_color}`, `${office_work_technical_report_engine}`, `${office_work_technical_report_model}`, `${office_work_technical_report_brand}`, `${office_work_technical_report_chassis}`, `${office_work_technical_report_description}` ])
+        const response2 = await pool.query(`INSERT INTO office_work_technical_report (workshop_office_work_id, office_work_technical_report_km, office_work_technical_report_ppu, office_work_technical_report_fuel_type, office_work_technical_report_color, office_work_technical_report_engine, office_work_technical_report_model, office_work_technical_report_brand, office_work_technical_report_chassis, office_work_technical_report_description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [`${workshop_office_work_id}`, `${office_work_technical_report_km}`, `${office_work_technical_report_ppu}`, `${office_work_technical_report_fuel_type}`, `${office_work_technical_report_color}`, `${office_work_technical_report_engine}`, `${office_work_technical_report_model}`, `${office_work_technical_report_brand}`, `${office_work_technical_report_chassis}`, `${office_work_technical_report_description}`])
         if (response2.affectedRows > 0) res.json({ 'Response': 'Operation Success' })
         else res.json({ 'Response': 'Operation Failed' })
     } else res.json({ 'Response': 'Workshop office work already has a technical report' })
@@ -1039,7 +1039,7 @@ router.post('/CompleteWorkshopOfficeWork', async (req, res) => {
 //Add a workshop office evaluation, with the correspondent rating and review. It requires the rut from the user that created it, the workshop office id and the work id (to update it's status as complete and evaluated) 
 router.post('/AddWorkshopOfficeEvaluation', async (req, res) => {
     const { workshop_evaluation_rating, workshop_evaluation_review, workshop_office_id, user_user_rut, workshop_office_work_id } = req.body.data
-    const response = await pool.query(`INSERT INTO workshop_office_evaluation (workshop_evaluation_rating, workshop_evaluation_review, user_user_rut, workshop_office_id) VALUES (?, ?, ?, ?)`, [`${workshop_evaluation_rating}`, `${workshop_evaluation_review}`, `${user_user_rut}`, `${workshop_office_id}`, ])
+    const response = await pool.query(`INSERT INTO workshop_office_evaluation (workshop_evaluation_rating, workshop_evaluation_review, user_user_rut, workshop_office_id) VALUES (?, ?, ?, ?)`, [`${workshop_evaluation_rating}`, `${workshop_evaluation_review}`, `${user_user_rut}`, `${workshop_office_id}`,])
     if (response.affectedRows > 0) {
         const response2 = await pool.query(`UPDATE workshop_office_work SET workshop_office_work_status = 'completeandevaluated' WHERE id = ?`, [`${workshop_office_work_id}`])
         if (response2.affectedRows > 0) res.json({ 'Response': 'Operation Success' })
@@ -1057,7 +1057,7 @@ router.get('/RealizePay', async (req, res) => {
     const returnUrl = "http://localhost:8080/ConfirmPay"
     const response = await WebpayPlus.Transaction.create(buyOrder, sessionId, amount, returnUrl);
     const { url, token } = response
-    res.json({'url': url, 'token': token})
+    res.json({ 'url': url, 'token': token })
     // res.status(307).redirect("https://www.google.com")
 
     // verificando si fue exitosa
@@ -1065,11 +1065,11 @@ router.get('/RealizePay', async (req, res) => {
 
 router.post('/ConfirmPay', async (req, res) => {
     const response = await WebpayPlus.Transaction.commit(req.body.token_ws);
-    if(response.status === "AUTHORIZED"){
+    if (response.status === "AUTHORIZED") {
         //sql para registrar en tabla ventas.
-        res.json({Response: "Payment Authorized", Data: response, URL: "http://localhost:3000/PaymentSuccess"})
-    }else{
-        res.json({Response: "Payment Not Authorized", URL: "http://localhost:3000/RealizePay"})
+        res.json({ Response: "Payment Authorized", Data: response, URL: "http://localhost:3000/PaymentSuccess" })
+    } else {
+        res.json({ Response: "Payment Not Authorized", URL: "http://localhost:3000/RealizePay" })
     }
 })
 
@@ -1115,7 +1115,7 @@ router.post('/FileWorkshopOfficeWorkDisputeCase', async (req, res) => {
         // Send the case e-mail to the workshop admin and the TuTaller system admins
         await transporter.sendMail({
             from: '"TuTaller" <tutaller.official@gmail.com>',
-            to: systemAdminsEmails+', '+workshopInfo.user_email,
+            to: systemAdminsEmails + ', ' + workshopInfo.user_email,
             cc: workCustomer.user_email,
             subject: `Apertura de caso para un servicio prestado del taller ${workshopInfo.workshop_name}`,
             html: `<p>Estimado administrador del taller ${workshopInfo.workshop_name}, ${workshopInfo.user_name} ${workshopInfo.user_last_name}, y administradores de TuTaller, este 
@@ -1206,7 +1206,7 @@ router.post('/ResolveWorkshopOfficeWorkDisputeCase', async (req, res) => {
         //Send the e-mail
         await transporter.sendMail({
             from: '"TuTaller" <tutaller.official@gmail.com>',
-            to: customer_email+', '+workshop_admin_email,
+            to: customer_email + ', ' + workshop_admin_email,
             bcc: systemAdminsEmails,
             subject: `Resolución de caso para un servicio prestado del taller ${workshop_name}`,
             html: `<p>Estimado administrador del taller ${workshop_name}, ${workshop_admin_name} ${workshop_admin_last_name}, y el cliente del servicio, ${customer_name} ${customer_last_name}, esta resolución de 
@@ -1229,6 +1229,116 @@ router.post('/ResolveWorkshopOfficeWorkDisputeCase', async (req, res) => {
         })
         res.json({ 'Response': 'Operation Success' })
     } else res.json({ 'Response': 'Dispute already resolved' })
+})
+
+//Adds a usability questionnaire, adding its question and items (in the case of multiple choice question). It also deactivates the other questionnaires
+router.post('/AddUsabilityQuestionnaire', async (req, res) => {
+    const { usability_questionnaire_name, usability_questionnaire_description, questionnaire_question_list } = req.body.data
+    const response = await pool.query(`INSERT INTO usability_questionnaire (usability_questionnaire_name, usability_questionnaire_description, usability_questionnaire_status) VALUES (?, ?, 'active');`, [`${usability_questionnaire_name}`, `${usability_questionnaire_description}`])
+    if (response.affectedRows > 0) {
+        for (let i = 0; i < questionnaire_question_list.length; i++) {
+            const response2 = await pool.query(`INSERT INTO questionnaire_question (usability_questionnaire_id, questionnaire_question_name, questionnaire_question_type) VALUES (?, ?, ?)`, [`${response.insertId}`, `${questionnaire_question_list[i].questionNameInput}`, `${questionnaire_question_list[i].questionTypeInput}`])
+            for (let z = 0; z < questionnaire_question_list[i].questionItemList.length; z++) {
+                await pool.query(`INSERT INTO questionnaire_question_item (questionnaire_question_id, questionnarie_question_item_statement) VALUES (?, ?)`, [`${response2.insertId}`, `${questionnaire_question_list[i].questionItemList[z].questionItemNameInput}`])
+            }
+        }
+        await pool.query(`UPDATE usability_questionnaire SET usability_questionnaire_status = 'inactive' WHERE id NOT IN (?)`, [`${response.insertId}`])
+        res.json({ 'Response': 'Operation Success' })
+    } else res.json({ 'Response': 'Could not add questionnaire' })
+})
+
+//Get the usability questionnaire list general information
+router.get('/UsabilityQuestionnaireList', async (req, res) => {
+    const response = await pool.query(`SELECT * FROM usability_questionnaire ORDER BY usability_questionnaire_status`)
+    if (response.length > 0) res.json({ 'Response': 'Operation Success', 'UsabilityQuestionnaireList': response })
+    else res.json({ 'Response': 'Questionnaires not found' })
+})
+
+//Show usability questionnaire to a user who hasn't realized it yet
+router.post('/ShowUsabilityQuestionnaire', async (req, res) => {
+    const { user_user_rut } = req.body.data
+    const response = await pool.query(`SELECT * FROM usability_questionnaire WHERE usability_questionnaire_status = 'active' LIMIT 1`)
+    if (response.length > 0) {
+        const response2 = await pool.query(`SELECT status FROM user_usability_questionnaire WHERE user_user_rut = ? AND usability_questionnaire_id = ?`, [`${user_user_rut}`, `${response[0].id}`])
+        if (response2.length > 0) {
+            if (response2[0].status == null || response2[0].status == 'todo') res.json({ 'Response': 'Operation Success', 'UsabilityQuestionnaire': response })
+            else res.json({ 'Response': 'User cannot do the questionnaire' })
+        } else res.json({ 'Response': 'Operation Success', 'UsabilityQuestionnaire': response })
+    }
+    else res.json({ 'Response': 'No active questionnaire found' })
+})
+
+//Gets from a usability questionnaire the list than contains its questions and items (this applies only for multiple choice questions)
+router.post('/UsabilityQuestionnaireQuestionList', async (req, res) => {
+    const { usability_questionnaire_id } = req.body.data
+    const response = await pool.query(`SELECT
+    q.id AS questionnaire_question_id,
+    q.questionnaire_question_name,
+    q.questionnaire_question_type,
+    qi.questionnarie_question_item_statement
+    FROM questionnaire_question q
+    LEFT OUTER JOIN questionnaire_question_item qi
+    ON q.id = qi.questionnaire_question_id
+    WHERE usability_questionnaire_id = ?`, [`${usability_questionnaire_id}`])
+    if (response.length > 0) res.json({ 'Response': 'Operation Success', 'UsabilityQuestionnaireQuestionList': response })
+    else res.json({ 'Response': 'Questions not found' })
+})
+
+//Get from a usability questionnaire the list that contains its questions and the answers for each question
+router.post('/UsabilityQuestionnaireAnswerList', async (req, res) => {
+    const { usability_questionnaire_id } = req.body.data
+    const response = await pool.query(`SELECT
+    q.id AS questionnaire_question_id,
+    q.questionnaire_question_name,
+    q.questionnaire_question_type,
+    qa.questionnaire_response,
+    qa.user_user_rut
+    FROM
+    questionnaire_question q
+    LEFT OUTER JOIN questionnaire_question_answer qa
+    ON q.id = qa.questionnaire_question_id
+    WHERE q.usability_questionnaire_id = ?`, [`${usability_questionnaire_id}`])
+    if (response.length > 0) res.json({ 'Response': 'Operation Success', 'UsabilityQuestionnaireAnswerList': response })
+    else res.json({ 'Response': 'Answers not found' })
+})
+
+router.post('/ChangeUserUsabilityQuestionnaireStatus', async (req, res) => {
+    const { usability_questionnaire_id, user_user_rut, status } = req.body.data
+    const response = await pool.query(`SELECT * FROM user_usability_questionnaire WHERE usability_questionnaire_id = ? AND user_user_rut = ?`, [`${usability_questionnaire_id}`, `${user_user_rut}`])
+    let isUpdateORInsertStatusOK = false
+    if (response.length > 0) {
+        if (response[0].status !== 'complete' || response[0].status !== 'dolater' || response[0].status !== 'dontremind') {
+            const response2 = await pool.query(`UPDATE user_usability_questionnaire SET status = ? WHERE usability_questionnaire_id = ? AND user_user_rut = ?`, [`${status}`, `${usability_questionnaire_id}`, `${user_user_rut}`])
+            if (response2.affectedRows > 0) isUpdateORInsertStatusOK = true
+        }
+    } else {
+        const response3 = await pool.query(`INSERT INTO user_usability_questionnaire (status, usability_questionnaire_id, user_user_rut) VALUES (?, ?, ?)`, [`${status}`, `${usability_questionnaire_id}`, `${user_user_rut}`])
+        if (response3.affectedRows > 0) isUpdateORInsertStatusOK = true
+    }
+    //If the status was changed succesfully
+    if (isUpdateORInsertStatusOK) {
+        //If the new status is dolater
+        if (status == 'dolater') {
+            await pool.query(`DROP EVENT IF EXISTS DoUsabilityQuestionnaireLater${usability_questionnaire_id}${user_user_rut};`)
+            await pool.query(`CREATE EVENT DoUsabilityQuestionnaireLater${usability_questionnaire_id}${user_user_rut} ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 day DO UPDATE user_usability_questionnaire SET status = 'todo' WHERE usability_questionnaire_id = ? AND user_user_rut = ?`, [`${usability_questionnaire_id}`, `${user_user_rut}`])
+        }
+        res.json({ 'Response': 'Operation Success' })
+    } else res.json({ 'Response': 'Cannot change the status' })
+})
+
+router.post('/AnswerUsabilityQuestionnaire', async (req, res) => {
+    const { user_user_rut, usability_questionnaire_id, questionnaire_question_list } = req.body.data
+    const response = await pool.query(`SELECT status FROM user_usability_questionnaire WHERE usability_questionnaire_id = ? AND user_user_rut = ?`, [`${usability_questionnaire_id}`, `${user_user_rut}`])
+    let canAnswer = false
+    if (response.length > 0) {
+        if (response[0].status = 'todo') canAnswer = true
+    } else canAnswer = true
+    if (canAnswer) {
+        for (let i = 0; i < questionnaire_question_list.length; i++) {
+            await pool.query(`INSERT INTO questionnaire_question_answer (user_user_rut, questionnaire_question_id, questionnaire_response) VALUES (?, ?, ?)`, [`${user_user_rut}`, `${questionnaire_question_list[i].questionnaire_question_id}`, `${questionnaire_question_list[i].questionnaire_response.trim()}`])
+        }
+        res.json({ 'Response': 'Operation Success' })
+    } else res.json({ 'Response': 'Cannot answer the questionnaire' })
 })
 
 module.exports = router
