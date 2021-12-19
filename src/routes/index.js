@@ -194,6 +194,7 @@ router.post('/DisableAccount', async (req, respuesta) => {
     })
 })
 
+//Send postulation, inserting a new workshop, the postulant's identity document image and notifies via e-mail to the system admins
 router.post('/SendPostulation', async (req, res) => {
     const { user_rut, workshop_name, workshop_number, workshop_description, workshop_business_name, postulation_message } = req.body
     const statement = `INSERT INTO workshop (workshop_name, workshop_number, workshop_description, workshop_business_name) VALUES (?, ?, ?, ?)`
@@ -227,6 +228,7 @@ router.post('/SendPostulation', async (req, res) => {
     }
 })
 
+//Receives the workshop postulation list, getting the postulant information, the workshop and its principal office
 router.get('/WorkshopPostulations', async (req, res) => {
     const statement = `SELECT
     p.id,
