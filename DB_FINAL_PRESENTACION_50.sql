@@ -153,6 +153,7 @@ CREATE TABLE IF NOT EXISTS `tutaller`.`workshop` (
   `workshop_name` VARCHAR(45) NOT NULL,
   `workshop_number` INT(11) NOT NULL,
   `workshop_description` VARCHAR(580) NOT NULL,
+  `workshop_business_name` VARCHAR(100) NOT NULL,
   PRIMARY KEY (`id`))
 ENGINE = InnoDB
 AUTO_INCREMENT = 38
@@ -382,7 +383,7 @@ CREATE TABLE IF NOT EXISTS `tutaller`.`payment_receipt_suscription` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `workshop_suscription_id` INT(11) NOT NULL,
   `payment_receipt_id` INT(11) NOT NULL,
-  PRIMARY KEY (`id`, `workshop_suscription_id`, `payment_receipt_id`),
+  PRIMARY KEY (`id`),
   CONSTRAINT `fk_payment_receipt_suscription_payment_receipt1`
     FOREIGN KEY (`payment_receipt_id`)
     REFERENCES `tutaller`.`payment_receipt` (`id`)
@@ -456,6 +457,7 @@ CREATE TABLE IF NOT EXISTS `tutaller`.`postulation` (
   `postulation_message` VARCHAR(99) NOT NULL,
   `workshop_id` SMALLINT(6) NOT NULL,
   `postulation_date_time` DATETIME NOT NULL,
+  `postulation_user_identity_document_image_id` INT NOT NULL,
   PRIMARY KEY (`id`),
   CONSTRAINT `fk_postulation_workshop1`
     FOREIGN KEY (`workshop_id`)
@@ -465,6 +467,11 @@ CREATE TABLE IF NOT EXISTS `tutaller`.`postulation` (
   CONSTRAINT `fk_postulations_user1`
     FOREIGN KEY (`user_user_rut`)
     REFERENCES `tutaller`.`user` (`user_rut`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_postulation_image1`
+    FOREIGN KEY (`postulation_user_identity_document_image_id`)
+    REFERENCES `tutaller`.`image` (`id`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION)
 ENGINE = InnoDB
@@ -479,6 +486,7 @@ CREATE TABLE IF NOT EXISTS `tutaller`.`usability_questionnaire` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `usability_questionnaire_name` VARCHAR(45) NOT NULL,
   `usability_questionnaire_description` VARCHAR(580) NOT NULL,
+  `usability_questionnaire_status` VARCHAR(45) NOT NULL,
   PRIMARY KEY (`id`))
 ENGINE = InnoDB
 DEFAULT CHARACTER SET = utf8;
@@ -529,7 +537,7 @@ DEFAULT CHARACTER SET = utf8;
 -- Table `tutaller`.`questionnaire_question_item`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `tutaller`.`questionnaire_question_item` (
-  `id` INT(11) NOT NULL,
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
   `questionnaire_question_id` INT(11) NOT NULL,
   `questionnarie_question_item_statement` VARCHAR(580) NOT NULL,
   PRIMARY KEY (`id`),
@@ -589,7 +597,7 @@ DEFAULT CHARACTER SET = utf8;
 -- Table `tutaller`.`user_usability_questionnaire`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `tutaller`.`user_usability_questionnaire` (
-  `id` INT(11) NOT NULL,
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
   `user_user_rut` INT(11) NOT NULL,
   `usability_questionnaire_id` INT(11) NOT NULL,
   `status` VARCHAR(45) NOT NULL,
@@ -662,6 +670,7 @@ CREATE TABLE IF NOT EXISTS `tutaller`.`workshop_office_service_payment_receipt` 
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `workshop_office_service_id` INT(11) NOT NULL,
   `payment_receipt_id` INT(11) NOT NULL,
+  `payment_status` VARCHAR(25) NOT NULL,
   PRIMARY KEY (`id`),
   CONSTRAINT `fk_workshop_office_service_payment_receipt_payment_receipt1`
     FOREIGN KEY (`payment_receipt_id`)
@@ -681,9 +690,10 @@ DEFAULT CHARACTER SET = utf8;
 -- Table `tutaller`.`workshop_office_work_case`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `tutaller`.`workshop_office_work_case` (
-  `idworkshop_office_work_case` INT(11) NOT NULL,
+  `idworkshop_office_work_case` INT(11) NOT NULL AUTO_INCREMENT,
   `workshop_office_work_case_msg` VARCHAR(255) NOT NULL,
   `case_current_status` VARCHAR(45) NOT NULL,
+  `workshop_office_work_case_date_time` DATETIME NOT NULL,
   `workshop_office_work_id` INT(11) NOT NULL,
   `user_user_rut` INT(11) NOT NULL,
   PRIMARY KEY (`idworkshop_office_work_case`),
@@ -1154,10 +1164,9 @@ INSERT INTO `tutaller`.`commune` (`region_id`, `commune_name`) VALUES ('16','Tim
 INSERT INTO `tutaller`.`commune` (`region_id`, `commune_name`) VALUES ('16','Natales');
 INSERT INTO `tutaller`.`commune` (`region_id`, `commune_name`) VALUES ('16','Torres del Paine');
 
-INSERT INTO `offer` (`id`,`offer_name`,`offer_discount`) VALUES (1,'none',0);
+INSERT INTO `offer` (`id`,`offer_name`,`offer_discount`, `offer_valid_until_date`, `offer_valid_until_time`) VALUES (1,'none',0,'1969-01-01','00:00');
 INSERT INTO `workshop_office_suscription` (`id`,`offer_id`,`name`,`price`,`periodicity`,`description`) VALUES (1,1,'unsubscribed',0,'none','without subscription');
 INSERT INTO `workshop_office_suscription` (`id`,`offer_id`,`name`,`price`,`periodicity`,`description`) VALUES (2,1,'basic',3533,'monthly','monthly basic plan');
-
 
 SET SQL_MODE=@OLD_SQL_MODE;
 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
