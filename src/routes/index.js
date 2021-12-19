@@ -194,37 +194,76 @@ router.post('/DisableAccount', async (req, respuesta) => {
     })
 })
 
+//Send postulation, inserting a new workshop, the postulant's identity document image and notifies via e-mail to the system admins 
 router.post('/SendPostulation', async (req, res) => {
-    const { user_rut, workshop_name, workshop_number, workshop_description, postulation_message } = req.body.data
-    const statement = `INSERT INTO workshop (workshop_name, workshop_number, workshop_description) VALUES (?, ?, ?)`
-    const response = await pool.query(statement, [`${workshop_name}`, `${workshop_number}`, `${workshop_description}`])
+    const { user_rut, workshop_name, workshop_number, workshop_description, workshop_business_name, postulation_message } = req.body
+    const statement = `INSERT INTO workshop (workshop_name, workshop_number, workshop_description, workshop_business_name) VALUES (?, ?, ?, ?)`
+    const response = await pool.query(statement, [`${workshop_name}`, `${workshop_number}`, `${workshop_description}`, `${workshop_business_name}`])
     if (response.affectedRows > 0) {
-        const statement2 = `INSERT INTO postulation (user_user_rut, postulation_message, postulation_current_status, workshop_id, postulation_date_time) VALUES (?, ?, ?, ?, now())`
-        const response2 = await pool.query(statement2, [`${user_rut}`, `${postulation_message}`, `pending`, `${response.insertId}`])
+        //Process to save the image in the server
+        const image = req.files.file
+        const extension = image.name.split(`.`).pop()
+        //Process to save the route in the database
+        const resSaveImage = await pool.query(`INSERT INTO IMAGE (image_name, image_path, image_ext) VALUES (?, ?, ?)`, [`${image.name}`, `public/images/${image.name}`, `${extension}`])
+        await pool.query(`UPDATE image set image_name= "${resSaveImage.insertId}${image.name}", image_path= "${`public/images/${resSaveImage.insertId}${image.name}`}" WHERE id = ${resSaveImage.insertId}`)
+        fs.renameSync(path.resolve(image.path), path.resolve(`public/images/${resSaveImage.insertId}${image.name}`));
+        //Process to insert the postulation, including the identity image document
+        const statement2 = `INSERT INTO postulation (user_user_rut, postulation_message, postulation_current_status, workshop_id, postulation_date_time, postulation_user_identity_document_image_id) VALUES (?, ?, ?, ?, now(), ?)`
+        const response2 = await pool.query(statement2, [`${user_rut}`, `${postulation_message}`, `pending`, `${response.insertId}`, `${resSaveImage.insertId}`])
         if (response2.affectedRows > 0) {
-            res.json({ 'Response': 'Operation Success' })
+            //System admins e-mail list
+            const response3 = await pool.query(`SELECT user_email FROM user WHERE user_type_id = 1`)
+            const systemAdminsEmails = response3.map(element => Object.values(element))
+            // Send e-mail to all system admins
+            await transporter.sendMail({
+                from: '"TuTaller" <tutaller.official@gmail.com>',
+                to: systemAdminsEmails,
+                subject: `Postulación de taller recibida`,
+                html: `<p>Estimados administradores de TuTaller, han recibido la postulación del taller ${workshop_name}, por favor revisen el sistema para revisar dicha postulación para posteriormente aceptarla o rechazarla.</p><br/>`
+            })
+            res.json({ 'Response': 'Operation Success', 'WorkshopId': response.insertId })
         }
     } else {
         res.json({ 'Response': 'Operation Failed' })
     }
 })
 
+//Receives the workshop postulation list, getting the postulant information, the workshop and its principal office
 router.get('/WorkshopPostulations', async (req, res) => {
     const statement = `SELECT
-                    w1.id,
-                    postulation_current_status,
-                    postulation_message,
-                    workshop_id,
-                    postulation_date_time,
-                    workshop_name,
-                    workshop_description,
-                    workshop_number,
-                    user_user_rut
-                    FROM
-                    postulation w1
-                    INNER JOIN workshop w2
-                    ON w1.workshop_id = w2.id
-                    ORDER BY postulation_date_time desc`
+    p.id,
+    p.postulation_current_status,
+    p.postulation_message,
+    p.workshop_id,
+    p.postulation_date_time,
+    p.user_user_rut AS postulant_rut,
+    up.user_name AS postulant_name,
+    up.user_last_name AS postulant_last_name,
+    w.workshop_name,
+    w.workshop_description,
+    w.workshop_number,
+    w.workshop_business_name,
+	r.region_name AS workshop_office_region,
+    c.commune_name AS workshop_office_commune,
+    o.workshop_office_address,
+    o.workshop_office_phone,
+    i.image_name AS postulation_user_identity_document_image
+    FROM
+    postulation p
+    INNER JOIN workshop w
+    ON p.workshop_id = w.id
+    INNER JOIN image i
+    ON p.postulation_user_identity_document_image_id = i.id
+    INNER JOIN user up
+    ON p.user_user_rut = up.user_rut
+    INNER JOIN workshop_office o
+    ON w.id = o.workshop_id
+    INNER JOIN commune c
+    ON o.commune_id = c.id
+    INNER JOIN region r
+    ON c.region_id = r.id
+    GROUP BY p.id
+    ORDER BY postulation_date_time DESC`
     const response = await pool.query(statement)
     if (response.length > 0) {
         res.json({ 'Response': 'Operation Success', 'Postulations': response })
