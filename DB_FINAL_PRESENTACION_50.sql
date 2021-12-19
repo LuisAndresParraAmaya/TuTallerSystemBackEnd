@@ -1163,10 +1163,9 @@ INSERT INTO `tutaller`.`commune` (`region_id`, `commune_name`) VALUES ('16','Tim
 INSERT INTO `tutaller`.`commune` (`region_id`, `commune_name`) VALUES ('16','Natales');
 INSERT INTO `tutaller`.`commune` (`region_id`, `commune_name`) VALUES ('16','Torres del Paine');
 
-INSERT INTO `offer` (`id`,`offer_name`,`offer_discount`) VALUES (1,'none',0);
+INSERT INTO `offer` (`id`,`offer_name`,`offer_discount`, `offer_valid_until_date`, `offer_valid_until_time`) VALUES (1,'none',0,'1969-01-01','00:00');
 INSERT INTO `workshop_office_suscription` (`id`,`offer_id`,`name`,`price`,`periodicity`,`description`) VALUES (1,1,'unsubscribed',0,'none','without subscription');
 INSERT INTO `workshop_office_suscription` (`id`,`offer_id`,`name`,`price`,`periodicity`,`description`) VALUES (2,1,'basic',3533,'monthly','monthly basic plan');
-
 
 SET SQL_MODE=@OLD_SQL_MODE;
 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
