@@ -974,29 +974,61 @@ router.post('/WorkshopOfficeWorkTechnicalReport', async (req, res) => {
     else res.json({ 'Response': 'Technical report not found' })
 })
 
-router.get('/RealizePay', async (req, res) => {
+router.post('/RealizePay', async (req, res) => {
     //generar url y token con funcion de transbank api.
     //crear transacción
     //llegaria del frontend
-    const buyOrder = "001"
-    const sessionId = "A01"
+    // incrementable numero de orden
+    const buyOrder = req.body.data.rut
+    const sessionId = req.body.data.sessionId
     const amount = 3533
     const returnUrl = "http://localhost:8080/ConfirmPay"
     const response = await WebpayPlus.Transaction.create(buyOrder, sessionId, amount, returnUrl);
     const { url, token } = response
     res.json({'url': url, 'token': token})
-    // res.status(307).redirect("https://www.google.com")
-
-    // verificando si fue exitosa
 })
 
 router.post('/ConfirmPay', async (req, res) => {
     const response = await WebpayPlus.Transaction.commit(req.body.token_ws);
     if(response.status === "AUTHORIZED"){
         //sql para registrar en tabla ventas.
-        res.json({Response: "Payment Authorized", Data: response, URL: "http://localhost:3000/PaymentSuccess"})
+        const workshop_office_id = response.session_id
+        const sql = `UPDATE workshop_office SET workshop_suscription_id = 2 WHERE id = ${workshop_office_id}`
+        await pool.query(sql)
+        // Agregar registro en tabla payment_receipt (rut, fecha y hora de transaccion)
+        const date = response.transaction_date.split("T")[0]
+        const time = response.transaction_date.split("T")[1].split(".")[0]
+        const rut = response.buy_order
+        const sql2 = `INSERT INTO payment_receipt (user_rut, payment_receipt_date,payment_receipt_time)
+        VALUES (${rut}, "${date}", "${time}")`
+        const result = await pool.query(sql2)
+        // Agregar registro en tabla payment_receipt_suscription 
+        const payment_receipt_id = result.insertId
+        const sql3 = `INSERT INTO payment_receipt_suscription (workshop_suscription_id, payment_receipt_id)
+        VALUES (2, ${payment_receipt_id})`
+        await pool.query(sql3)
+        // Cron
+        await pool.query(`DROP EVENT IF EXISTS SubscriptionDisable${workshop_office_id};`)
+        await pool.query(`CREATE EVENT SubscriptionDisable${workshop_office_id} 
+        ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 minute DO UPDATE workshop_office set workshop_suscription_id = 1 WHERE id = ${workshop_office_id};`)
+        // Enviar correo electronico con comprobante.
+        
+        await transporter.sendMail({
+            from: '"TuTaller" <luisandresparraamaya@gmail.com>', // sender address
+            to: "maskre65@gmail.com", // list of receivers
+            subject: "Suscripción exitosa a TuTaller", // Subject line
+            html: `<b>
+            <h1>COMPROBANTE DE PAGO:</h1>
+            Duración de la suscripción: 1 Mes<br/>
+            Medio de pago: WEBPAY<br/>
+            Monto pagado: $${response.amount} CLP<br/>
+            Fecha de transacción: ${date} ${time}
+            </b>`, // html body
+        })
+        // 
+        res.redirect("http://localhost:3000/PaymentSuccess")
     }else{
-        res.json({Response: "Payment Not Authorized", URL: "http://localhost:3000/RealizePay"})
+        res.redirect("http://localhost:3000/PaymentReject")
     }
 })
 
