@@ -45,26 +45,21 @@ router.post('/CreateAccount', async (req, res) => {
 router.post('/Login', async (req, respuesta) => {
     const { user_email, user_password } = req.body.data
     // Traer contraseña encriptada del usuario
-    const response = await pool.query('SELECT * FROM `user` WHERE `user_email` = ?', [`${user_email}`]);
+    const response = await pool.query('SELECT * FROM `user` WHERE `user_email` = ?', [`${user_email}`])
     if (response.length > 0) {
         bcryptjs.compare(user_password, response[0].user_password, (err, res) => {
             if (res) {
                 if (response[0].user_status == 'disabled') {
-                    const response2 = await pool.query(`SELECT user_rut FROM user WHERE user_email = ?`, [`${user_email}`])
-                    const response3 = await pool.query(`UPDATE user SET user_status = "enabled" WHERE user_rut = ?`, [`${response2[0].user_rut}`])
-                    if (response3.affectedRows > 0) {
-                        pool.query(`DROP EVENT IF EXISTS UserDisable${response2[0].user_rut};`)
-                        respuesta.json({
-                            'Response': 'Reactivate Success',
-                            'user_rut': response[0].user_rut,
-                            'user_name': response[0].user_name,
-                            'user_last_name': response[0].user_last_name,
-                            'user_phone': response[0].user_phone,
-                            'user_email': response[0].user_email,
-                            'user_password': response[0].user_password,
-                            'user_type_id': response[0].user_type_id
-                        })
-                    }
+                    respuesta.json({
+                        'Response': 'Reactivate Required',
+                        'user_rut': response[0].user_rut,
+                        'user_name': response[0].user_name,
+                        'user_last_name': response[0].user_last_name,
+                        'user_phone': response[0].user_phone,
+                        'user_email': response[0].user_email,
+                        'user_password': response[0].user_password,
+                        'user_type_id': response[0].user_type_id
+                    })
                 }
                 if (response[0].user_status == 'deleted') {
                     respuesta.json({ 'Response': 'Account deleted' })
@@ -89,6 +84,16 @@ router.post('/Login', async (req, respuesta) => {
         respuesta.json({ 'Response': 'Login Failed' })
     }
 
+})
+
+//Reactivates an account, setting the user status to enabled again and dropping any event related to deleting that account
+router.post('/ReactivateAccount', async (req, res) => {
+    const { user_rut } = req.body.data
+    const response = await pool.query(`UPDATE user SET user_status = "enabled" WHERE user_rut = ?`, [`${user_rut}`])
+    if (response.affectedRows > 0) {
+        await pool.query(`DROP EVENT IF EXISTS UserDisable${user_rut};`)
+        res.json({ 'Response': 'Operation Success' })
+    } else res.json({ 'Response': 'User not found' })
 })
 
 router.post('/ModifyProfile', async (req, respuesta) => {
