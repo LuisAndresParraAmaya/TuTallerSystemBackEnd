@@ -1206,7 +1206,7 @@ router.post('/ConfirmPayMobile', async (req, res) => {
         const itemId = req.query.itemId
         const itemDescription = req.query.itemDescription
         const operationType = req.query.operationType
-        const buyerId = req.query.merchantId
+        const buyerId = req.query.buyerId
         const merchantName = req.query.merchantName
         let emailSubjectOperationType = ''
         let emailMessageOperationType = ''
@@ -1236,7 +1236,7 @@ router.post('/ConfirmPayMobile', async (req, res) => {
                 await pool.query(`INSERT INTO workshop_office_service_payment_receipt (workshop_office_service_id, payment_receipt_id, payment_status) VALUES (?, ?, 'detained')`, [`${itemId}`, `${payment_receipt_id}`])
                 break
             case 'paySubscription':
-                await pool.query(`INSERT INTO payment_receipt_suscription (workshop_suscription_id, payment_receipt_id) VALUES (?, ?)`, [`${itemId}` `${payment_receipt_id}`])
+                await pool.query(`INSERT INTO payment_receipt_suscription (workshop_suscription_id, payment_receipt_id) VALUES (?, ?)`, [`${itemId}`, `${payment_receipt_id}`])
                 // Cron
                 await pool.query(`DROP EVENT IF EXISTS SubscriptionDisable${operationType}${buyerId};`)
                 //TODO: Cambiar de 1 minute a 1 month
