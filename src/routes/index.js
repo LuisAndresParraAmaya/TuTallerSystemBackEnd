@@ -1277,7 +1277,6 @@ router.post('/ConfirmPayMobile', async (req, res) => {
             subject: emailSubjectOperationType, // Subject line
             html: `<b>
                 <h1>COMPROBANTE DE PAGO:</h1>
-                Orden de compra: <br/>
                 Cliente: ${sql3[0].user_name} ${sql3[0].user_last_name}<br/>
                 Comerciante: ${merchantName}<br/>
                 Descripción: ${itemDescription}<br/>
