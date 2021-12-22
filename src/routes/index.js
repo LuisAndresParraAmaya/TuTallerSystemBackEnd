@@ -1240,7 +1240,7 @@ router.post('/ConfirmPayMobile', async (req, res) => {
                 // Cron
                 await pool.query(`DROP EVENT IF EXISTS SubscriptionDisable${operationType}${buyerId};`)
                 //TODO: Cambiar de 1 minute a 1 month
-                await pool.query(`CREATE EVENT SubscriptionDisable${operationType}${buyerId} ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 minute DO UPDATE workshop_office set workshop_suscription_id = 1 WHERE id = ?`, [`${buyerId}`])
+                await pool.query(`CREATE EVENT SubscriptionDisable${operationType}${buyerId} ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 month DO UPDATE workshop_office set workshop_suscription_id = 1 WHERE id = ?`, [`${buyerId}`])
                 break
             case 'payWorkshopAd':
                 await pool.query(`INSERT INTO payment_receipt_workshop_ad (workshop_ad_id, payment_receipt_id) VALUES (?, ?)`, [`${itemId}`, `${payment_receipt_id}`])
