@@ -505,7 +505,7 @@ router.post('/WorkshopOfficeServiceList', async (req, res) => {
     o.offer_discount,
     o.offer_valid_until_date,
     o.offer_valid_until_time,
-    ROUND(s.workshop_office_service_price-(s.workshop_office_service_price * (o.offer_discount/100)), 2) AS offer_price
+    ROUND(s.workshop_office_service_price-(s.workshop_office_service_price * (o.offer_discount/100)), 0) AS offer_price
     FROM 
     workshop_office_service s
     INNER JOIN offer o
@@ -814,7 +814,7 @@ router.get('/SubscriptionList', async (req, res) => {
     o.offer_discount,
     o.offer_valid_until_date,
     o.offer_valid_until_time,
-    ROUND(s.price-(s.price * (o.offer_discount/100)), 2) AS offer_price
+    ROUND(s.price-(s.price * (o.offer_discount/100)), 0) AS offer_price
     FROM 
     workshop_office_suscription s
     INNER JOIN offer o
@@ -1132,20 +1132,6 @@ router.post('/RealizePay', async (req, res) => {
     res.json({ 'url': url, 'token': token })
 })
 
-router.post('/RealizePayMobile', async (req, res) => {
-    //generar url y token con funcion de transbank api.
-    //crear transacción
-    //llegaria del frontend
-    // incrementable numero de orden
-    const buyOrder = req.body.data.rut
-    const sessionId = req.body.data.sessionId
-    const amount = req.body.data.amount
-    const returnUrl = "http://10.0.2.2:8080/ConfirmPayMobile"
-    const response = await WebpayPlus.Transaction.create(buyOrder, sessionId, amount, returnUrl);
-    const { url, token } = response
-    res.json({ 'url': url, 'token': token })
-})
-
 router.post('/ConfirmPay', async (req, res) => {
     const response = await WebpayPlus.Transaction.commit(req.body.token_ws);
     if (response.status === "AUTHORIZED") {
@@ -1190,48 +1176,120 @@ router.post('/ConfirmPay', async (req, res) => {
     }
 })
 
+router.post('/RealizePayMobile', async (req, res) => {
+    //generar url y token con funcion de transbank api.
+    //crear transacción
+    //llegaria del frontend
+    // incrementable numero de orden
+    const buyOrder = req.body.data.rut
+    const sessionId = req.body.data.sessionId
+    const amount = req.body.data.amount
+    const itemId = req.body.data.itemId // Service id || Suscription id || Ad id
+    const itemDescription = req.body.data.itemDescription
+    const operationType = req.body.data.operationType
+    const buyerId = req.body.data.buyerId // Office id (when paySubscription) || 0 (when payWorkshopService or paySubscription. Basically null)
+    const merchantName = req.body.data.merchantName
+    const returnUrl = "http://10.0.2.2:8080/ConfirmPayMobile?itemId=" + itemId +
+        '&itemDescription=' + itemDescription +
+        '&operationType=' + operationType +
+        '&buyerId=' + buyerId +
+        '&merchantName=' + merchantName
+    const response = await WebpayPlus.Transaction.create(buyOrder, sessionId, amount, returnUrl);
+    const { url, token } = response
+    res.json({ 'url': url, 'token': token })
+})
+
 router.post('/ConfirmPayMobile', async (req, res) => {
-    try {
-        const response = await WebpayPlus.Transaction.commit(req.body.token_ws);
-        if (response.status === "AUTHORIZED") {
-            console.log(response)
-            //sql para registrar en tabla ventas.
-            const workshop_office_id = response.session_id
-            await pool.query(`UPDATE workshop_office SET workshop_suscription_id = 2 WHERE id = ?`, [`${workshop_office_id}`])
-            // Agregar registro en tabla payment_receipt (rut, fecha y hora de transaccion)
-            const date = response.transaction_date.split("T")[0]
-            const time = response.transaction_date.split("T")[1].split(".")[0]
-            const rut = response.buy_order
-            const result = await pool.query(`INSERT INTO payment_receipt (user_rut, payment_receipt_date,payment_receipt_time) VALUES (?, ?, ?)`, [`${rut}`, `${date}`, `${time}`])
-            // Agregar registro en tabla payment_receipt_suscription 
-            const payment_receipt_id = result.insertId
-            const sql3 = `INSERT INTO payment_receipt_suscription (workshop_suscription_id, payment_receipt_id)
-            VALUES (2, ${payment_receipt_id})`
-            await pool.query(sql3)
-            // Cron
-            await pool.query(`DROP EVENT IF EXISTS SubscriptionDisable${workshop_office_id};`)
-            await pool.query(`CREATE EVENT SubscriptionDisable${workshop_office_id} 
-            ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 minute DO UPDATE workshop_office set workshop_suscription_id = 1 WHERE id = ${workshop_office_id};`)
-            // Enviar correo electronico con comprobante.
-            const sql4 = await pool.query(`SELECT user_email FROM user WHERE user_rut = ?`, [`${rut}`])
-            await transporter.sendMail({
-                from: '"TuTaller" <tutaller.official@gmail.com>', // sender address
-                to: sql4[0].user_email, // list of receivers
-                subject: "Suscripción exitosa a TuTaller", // Subject line
-                html: `<b>
+    const response = await WebpayPlus.Transaction.commit(req.body.token_ws)
+    if (response.status === "AUTHORIZED") {
+        //sql para registrar en tabla ventas.
+        const itemId = req.query.itemId
+        const itemDescription = req.query.itemDescription
+        const operationType = req.query.operationType
+        const buyerId = req.query.merchantId
+        const merchantName = req.query.merchantName
+        let emailSubjectOperationType = ''
+        let emailMessageOperationType = ''
+        switch (operationType) {
+            case 'payWorkshopService':
+                emailSubjectOperationType = 'Compra exitosa del servicio automotriz'
+                emailMessageOperationType = 'Estado: Retenido hasta que se finalice completamente el servicio automotriz.<br/>'
+                break
+            case 'paySubscription':
+                await pool.query(`UPDATE workshop_office SET workshop_suscription_id = 2 WHERE id = ?`, [`${buyerId}`])
+                emailSubjectOperationType = 'Suscripción exitosa a TuTaller'
+                emailMessageOperationType = 'Duración de la suscripción: 1 mes.<br/>'
+                break
+            case 'payWorkshopAd':
+                emailSubjectOperationType = 'Activación exitosa del anuncio publicitario'
+                emailMessageOperationType = 'Duración del anuncio: 24 horas desde ahora.<br/>'
+        }
+        // Agregar registro en tabla payment_receipt (rut, fecha y hora de transaccion)
+        const date = response.transaction_date.split("T")[0]
+        const time = response.transaction_date.split("T")[1].split(".")[0]
+        const rut = response.buy_order
+        const result = await pool.query(`INSERT INTO payment_receipt (user_rut, payment_receipt_date,payment_receipt_time) VALUES (?, ?, ?)`, [`${rut}`, `${date}`, `${time}`])
+        // Agregar registro en tabla payment_receipt_suscription
+        const payment_receipt_id = result.insertId
+        switch (operationType) {
+            case 'payWorkshopService':
+                await pool.query(`INSERT INTO workshop_office_service_payment_receipt (workshop_office_service_id, payment_receipt_id, payment_status) VALUES (?, ?, 'detained')`, [`${itemId}`, `${payment_receipt_id}`])
+                break
+            case 'paySubscription':
+                await pool.query(`INSERT INTO payment_receipt_suscription (workshop_suscription_id, payment_receipt_id) VALUES (?, ?)`, [`${itemId}` `${payment_receipt_id}`])
+                // Cron
+                await pool.query(`DROP EVENT IF EXISTS SubscriptionDisable${operationType}${buyerId};`)
+                //TODO: Cambiar de 1 minute a 1 month
+                await pool.query(`CREATE EVENT SubscriptionDisable${operationType}${buyerId} ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 minute DO UPDATE workshop_office set workshop_suscription_id = 1 WHERE id = ?`, [`${buyerId}`])
+                break
+            case 'payWorkshopAd':
+                await pool.query(`INSERT INTO payment_receipt_workshop_ad (workshop_ad_id, payment_receipt_id) VALUES (?, ?)`, [`${itemId}`, `${payment_receipt_id}`])
+        }
+        // Enviar correo electronico con comprobante al cliente, con copia oculta a el/los comerciante(s)
+        let sqlMerchantEmail = ''
+        switch (operationType) {
+            case 'payWorkshopService':
+                const responseWorkshopAdminEmail = await pool.query(`SELECT
+                ua.user_email
+                FROM
+                workshop_office_service s
+                INNER JOIN workshop_office o
+                ON s.workshop_office_id = o.id
+                INNER JOIN postulation p
+                ON o.workshop_id = p.workshop_id
+                INNER JOIN user ua
+                ON p.user_user_rut = ua.user_rut
+                WHERE s.id = ?
+                GROUP BY ua.user_email`, [`${itemId}`])
+                sqlMerchantEmail = responseWorkshopAdminEmail[0].user_email
+                break
+            case 'paySubscription':
+            case 'payWorkshopAd':
+                //TuTaller system admins e-mails (multiple)
+                const responseAdminsEmail = await pool.query(`SELECT user_email FROM user WHERE user_type_id = 1`)
+                sqlMerchantEmail = responseAdminsEmail.map(element => Object.values(element))
+        }
+        const sql3 = await pool.query(`SELECT user_email, user_name, user_last_name FROM user WHERE user_rut = ?`, [`${rut}`])
+        await transporter.sendMail({
+            from: '"TuTaller" <tutaller.official@gmail.com>', // sender address
+            to: sql3[0].user_email, // list of receivers
+            bcc: sqlMerchantEmail, // list of occult receivers with copy
+            subject: emailSubjectOperationType, // Subject line
+            html: `<b>
                 <h1>COMPROBANTE DE PAGO:</h1>
-                Duración de la suscripción: 1 Mes<br/>
-                Medio de pago: WEBPAY<br/>
+                Orden de compra: <br/>
+                Cliente: ${sql3[0].user_name} ${sql3[0].user_last_name}<br/>
+                Comerciante: ${merchantName}<br/>
+                Descripción: ${itemDescription}<br/>
+                ${emailMessageOperationType}
+                Medio de pago: WebPay<br/>
                 Monto pagado: $${response.amount} CLP<br/>
                 Fecha de transacción: ${date} ${time}
                 </b>`, // html body
-            })
-            res.redirect("http://10.0.2.2:3000/PaymentSuccess")
-        } else {
-            res.redirect("http://10.0.2.2:3000/PaymentReject")
-        }
-    } catch (e) {
-        console.log(e)
+        })
+        res.redirect("http://www.blankwebsite.com/")
+    } else {
+        res.redirect("https://www.blank.org/")
     }
 })
 
